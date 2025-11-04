@@ -1,4 +1,3 @@
 PDF to Voice v1.0
 
-create .env file
-create /config/config.js
+## edit .env file
