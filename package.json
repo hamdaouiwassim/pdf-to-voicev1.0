@@ -1,19 +1,26 @@
 {
-  "name": "api",
+  "name": "document-reader",
   "version": "1.0.0",
-  "description": "pdf to voice api",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "hamdaoui wassim",
+  "keywords": [],
+  "author": "",
   "license": "ISC",
+  "description": "",
   "dependencies": {
+    "@google/genai": "^1.27.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-fileupload": "^1.5.2",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "1.1.*",
+    "pdfkit": "^0.17.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.16"
   }
 }
