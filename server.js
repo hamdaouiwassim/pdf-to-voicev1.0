@@ -21,11 +21,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/uploads', express.static(config.UPLOADS_DIR));
+app.use('/audios', express.static(config.AUDIOS_DIR));
 app.use(fileUpload());
 
 // --- API Routes ---
 // Maintain backward compatibility for /api/extract-text
-app.post('/api/extract-text', documentController.extractText);
 app.use('/api/documents', documentRoutes);
 app.use('/api/tts', ttsRoutes);
 app.use('/api/qa', qaRoutes);

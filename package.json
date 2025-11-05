@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,6 +14,7 @@
     "@google/genai": "^1.27.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "edge-tts": "^1.0.1",
     "express": "^5.1.0",
     "express-fileupload": "^1.5.2",
     "pdf-parse": "1.1.*",

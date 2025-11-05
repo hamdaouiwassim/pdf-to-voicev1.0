@@ -9,20 +9,16 @@ const config = require('../config/config');
  */
 async function generateTTS(req, res) {
     try {
+        // Document ID validation is handled by middleware (validateDocIdInBody)
         const { docId } = req.body;
-
-        if (!docId) {
-            return res.status(400).json({ error: 'Document ID is required' });
-        }
-
         const text = await fileUtils.getAITextByDocId(docId);
 
         if (!text) {
             return res.status(404).json({ error: 'Document content not found' });
         }
 
-        // Check for cached audio
-        if (fileUtils.audioFileExists(docId)) {
+        // Check for cached audio (async)
+        if (await fileUtils.audioFileExists(docId)) {
             console.log(`[TTS] Serving cached audio for doc ID: ${docId}`);
             try {
                 const fileBuffer = await fileUtils.readAudioFile(docId);

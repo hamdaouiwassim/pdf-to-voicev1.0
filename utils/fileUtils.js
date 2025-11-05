@@ -25,13 +25,42 @@ function setupDirectories() {
 async function getAITextByDocId(docId) {
     try {
         const jsonFilePath = path.join(config.UPLOADS_DIR, `${docId}.json`);
-        if (fs.existsSync(jsonFilePath)) {
+        try {
+            await fsPromises.access(jsonFilePath);
             const content = await fsPromises.readFile(jsonFilePath, 'utf8');
             return JSON.parse(content).text;
+        } catch (accessError) {
+            if (accessError.code === 'ENOENT') {
+                return null;
+            }
+            throw accessError;
         }
-        return null;
     } catch (error) {
         console.error(`[FS Error] Failed to read text for ID ${docId}:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * Gets document metadata by docId
+ * @param {string} docId - Document ID
+ * @returns {Promise<Object | null>} Document metadata or null if not found
+ */
+async function getDocumentMetadata(docId) {
+    try {
+        const jsonFilePath = path.join(config.UPLOADS_DIR, `${docId}.json`);
+        try {
+            await fsPromises.access(jsonFilePath);
+            const content = await fsPromises.readFile(jsonFilePath, 'utf8');
+            return JSON.parse(content);
+        } catch (accessError) {
+            if (accessError.code === 'ENOENT') {
+                return null;
+            }
+            throw accessError;
+        }
+    } catch (error) {
+        console.error(`[FS Error] Failed to read metadata for ID ${docId}:`, error.message);
         return null;
     }
 }
@@ -87,13 +116,32 @@ async function getAllDocuments() {
 }
 
 /**
- * Checks if an audio file exists.
+ * Checks if an audio file exists (async).
  * @param {string} audioId - Audio file ID (without extension)
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-function audioFileExists(audioId) {
+async function audioFileExists(audioId) {
     const audioFilePath = path.join(config.AUDIOS_DIR, `${audioId}.wav`);
-    return fs.existsSync(audioFilePath);
+    try {
+        await fsPromises.access(audioFilePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Checks if a file exists (async).
+ * @param {string} filePath - Full file path
+ * @returns {Promise<boolean>}
+ */
+async function fileExists(filePath) {
+    try {
+        await fsPromises.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /**
@@ -120,9 +168,11 @@ async function saveAudioFile(audioId, audioBuffer) {
 module.exports = {
     setupDirectories,
     getAITextByDocId,
+    getDocumentMetadata,
     saveDocumentMetadata,
     getAllDocuments,
     audioFileExists,
+    fileExists,
     readAudioFile,
     saveAudioFile,
 };

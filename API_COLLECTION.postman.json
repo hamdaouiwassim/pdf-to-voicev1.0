@@ -1,0 +1,242 @@
+{
+	"info": {
+		"_postman_id": "document-reader-api",
+		"name": "Document Reader API",
+		"description": "Complete API collection for Document Reader service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Get Health Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "health"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Documents",
+			"item": [
+				{
+					"name": "Get All Documents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "documents"]
+						}
+					}
+				},
+				{
+					"name": "Upload PDF Document",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "pdfFile",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/documents",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "documents"]
+						}
+					}
+				},
+				{
+					"name": "Get PDF File",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/documents/:docId/file",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "documents", ":docId", "file"],
+							"variable": [
+								{
+									"key": "docId",
+									"value": "4ff58535-e232-47cb-b812-ad5a04793aa3",
+									"description": "Document ID (UUID)"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Summary (with Audio)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/documents/:docId/summary?language=fr",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "documents", ":docId", "summary"],
+							"query": [
+								{
+									"key": "language",
+									"value": "fr",
+									"description": "Language code (en, fr, es, de, it, pt). Default: fr"
+								}
+							],
+							"variable": [
+								{
+									"key": "docId",
+									"value": "4ff58535-e232-47cb-b812-ad5a04793aa3",
+									"description": "Document ID (UUID)"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Summary Audio Only",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/documents/:docId/summary/audio?language=fr",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "documents", ":docId", "summary", "audio"],
+							"query": [
+								{
+									"key": "language",
+									"value": "fr",
+									"description": "Language code (en, fr, es, de, it, pt). Default: fr"
+								}
+							],
+							"variable": [
+								{
+									"key": "docId",
+									"value": "4ff58535-e232-47cb-b812-ad5a04793aa3",
+									"description": "Document ID (UUID)"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Text-to-Speech",
+			"item": [
+				{
+					"name": "Generate TTS",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"docId\": \"4ff58535-e232-47cb-b812-ad5a04793aa3\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tts"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Question Answering",
+			"item": [
+				{
+					"name": "Answer Question (Free AI)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"question\": \"Qu'est-ce que l'intelligence artificielle?\",\n  \"useFreeAI\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/qa",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "qa"]
+						}
+					}
+				},
+				{
+					"name": "Answer Question (Google Gemini)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"question\": \"What is artificial intelligence?\",\n  \"useFreeAI\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/qa",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "qa"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Audio",
+			"item": [
+				{
+					"name": "Get Audio File",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/audio/:audioId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "audio", ":audioId"],
+							"variable": [
+								{
+									"key": "audioId",
+									"value": "qa-4ff58535-e232-47cb-b812-ad5a04793aa3",
+									"description": "Audio ID (e.g., qa-{uuid}, {docId}-summary, {docId})"
+								}
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}
+

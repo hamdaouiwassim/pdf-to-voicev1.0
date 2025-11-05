@@ -6,18 +6,10 @@ const fileUtils = require('../utils/fileUtils');
  */
 async function getAudio(req, res) {
     try {
+        // Audio ID validation is handled by middleware (validateAudioId)
         const { audioId } = req.params;
 
-        if (!audioId) {
-            return res.status(400).json({ error: 'Audio ID is required' });
-        }
-
-        // Security: Prevent directory traversal
-        if (audioId.includes('..') || audioId.includes('/') || audioId.includes('\\')) {
-            return res.status(400).json({ error: 'Invalid audio ID' });
-        }
-
-        if (!fileUtils.audioFileExists(audioId)) {
+        if (!(await fileUtils.audioFileExists(audioId))) {
             return res.status(404).json({ error: 'Audio file not found' });
         }
 

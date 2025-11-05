@@ -1,49 +1,39 @@
 const crypto = require('crypto');
 const pdfParse = require('pdf-parse');
+const fsPromises = require('fs').promises;
 const fileUtils = require('../utils/fileUtils');
-const pdfUtils = require('../utils/pdfUtils');
 const audioUtils = require('../utils/audioUtils');
 const geminiService = require('../services/geminiService');
+const localTTSService = require('../services/localTTSService');
 const config = require('../config/config');
+const constants = require('../utils/constants');
 const path = require('path');
 
 /**
  * Extract text from uploaded PDF and save metadata
  * POST /api/extract-text
  */
-async function extractText(req, res) {
+async function createDocument(req, res) {
     try {
-        if (!req.files || !req.files.pdfFile) {
-            return res.status(400).json({ error: 'No PDF file uploaded' });
-        }
-
-        // Validate file type
-        if (!config.ALLOWED_MIME_TYPES.includes(req.files.pdfFile.mimetype)) {
-            return res.status(400).json({ error: 'Only PDF files are allowed' });
-        }
-
-        // Validate file size
-        if (req.files.pdfFile.size > config.MAX_FILE_SIZE) {
-            return res.status(400).json({ 
-                error: `File size exceeds ${config.MAX_FILE_SIZE / 1024 / 1024}MB` 
-            });
-        }
-
+        // File validation is handled by middleware (validateFileUpload)
+        // Additional validation only if needed
         const pdfBuffer = req.files.pdfFile.data;
-        const result = await pdfParse(pdfBuffer);
-
+        
         // Generate unique ID for the document
         const docId = crypto.randomUUID();
-        const filename = `${docId}.pdf`;
+        const filename = `${docId}${constants.FILE_EXTENSIONS.PDF}`;
         const pdfFilePath = path.join(config.UPLOADS_DIR, filename);
 
-        // Save PDF file
-        await pdfUtils.createPDF(pdfFilePath, req.files.pdfFile.name, result.text);
+        // Parse PDF and save files in parallel for better performance
+        const [result] = await Promise.all([
+            pdfParse(pdfBuffer),
+            fsPromises.writeFile(pdfFilePath, pdfBuffer)
+        ]);
 
         // Create and save JSON sidecar file
         const sidecarData = {
             id: docId,
-            title: req.files.pdfFile.name.replace('.pdf', ''),
+            title: req.files.pdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, ''),
             text: result.text,
             filename: filename,
             length: result.text.length,
@@ -66,55 +56,6 @@ async function extractText(req, res) {
     }
 }
 
-/**
- * Create a new document (generate PDF from text)
- * POST /api/documents
- */
-async function createDocument(req, res) {
-    try {
-        const { title, text } = req.body;
-
-        if (!title || typeof title !== 'string' || title.trim().length === 0) {
-            return res.status(400).json({ error: 'Valid title is required' });
-        }
-
-        if (!text || typeof text !== 'string' || text.trim().length === 0) {
-            return res.status(400).json({ error: 'Valid text is required' });
-        }
-
-        const docId = crypto.randomUUID();
-        const filename = `${docId}.pdf`;
-        const pdfFilePath = path.join(config.UPLOADS_DIR, filename);
-
-        // Create and save PDF file
-        await pdfUtils.createPDF(pdfFilePath, title, text);
-
-        // Create and save JSON sidecar file
-        const sidecarData = {
-            id: docId,
-            title: title.trim(),
-            text: text.trim(),
-            filename: filename,
-            length: text.length,
-            timestamp: new Date().toISOString()
-        };
-
-        await fileUtils.saveDocumentMetadata(sidecarData);
-
-        console.log(`[FS] PDF saved to: ${filename}`);
-        res.status(201).json({
-            message: 'Document saved successfully.',
-            id: docId,
-            filename: filename
-        });
-    } catch (error) {
-        console.error("[FS Error] Failed to save document:", error);
-        res.status(500).json({ 
-            error: 'Failed to save document to file system.',
-            details: error.message 
-        });
-    }
-}
 
 /**
  * Get list of all documents
@@ -134,53 +75,119 @@ async function getAllDocuments(req, res) {
 }
 
 /**
+ * Get PDF file by document ID
+ * GET /api/documents/:docId/file
+ */
+async function getDocumentFile(req, res) {
+    try {
+        // Document ID validation is handled by middleware (validateDocId)
+        const { docId } = req.params;
+        const pdfFilePath = path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.PDF}`);
+
+        // Check if file exists (async)
+        if (!(await fileUtils.fileExists(pdfFilePath))) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        // Set appropriate headers and send file
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${docId}${constants.FILE_EXTENSIONS.PDF}"`);
+        res.sendFile(path.resolve(pdfFilePath));
+    } catch (error) {
+        console.error("[Document File Error]:", error);
+        res.status(500).json({ 
+            error: 'Failed to retrieve document file.',
+            details: error.message 
+        });
+    }
+}
+
+/**
  * Summarize a document by docId and generate audio from the summary
  * GET /api/documents/:docId/summary
  */
 async function summarizeDocument(req, res) {
     try {
+        // Document ID and language validation handled by middleware
         const { docId } = req.params;
         const { language } = req.query; // Optional language parameter (en, fr, etc.)
 
-        if (!docId) {
-            return res.status(400).json({ error: 'Document ID is required' });
+        // Get document metadata (includes cached summary if available)
+        const metadata = await fileUtils.getDocumentMetadata(docId);
+        if (!metadata) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
         }
 
-        // Get document text
-        const text = await fileUtils.getAITextByDocId(docId);
-
-        if (!text) {
-            return res.status(404).json({ error: 'Document not found' });
-        }
-
-        // Check for cached summary audio first
-        const summaryAudioId = `${docId}-summary`;
+        const summaryAudioId = `${docId}${constants.AUDIO_PREFIXES.SUMMARY}`;
         let wavBuffer = null;
         let summary = null;
 
-        if (fileUtils.audioFileExists(summaryAudioId)) {
-            console.log(`[Summary] Serving cached summary audio for doc ID: ${docId}`);
-            try {
-                wavBuffer = await fileUtils.readAudioFile(summaryAudioId);
-                // We still need to get the summary text, so we'll generate it
-                // Or we could cache the summary text too, but for now let's generate it
-            } catch (error) {
-                console.warn(`[Summary] Failed to read cached audio, regenerating. Error: ${error.message}`);
-                // Fall through to regeneration
+        // Default to French for summaries
+        const summaryLanguage = language || 'fr';
+        
+        // Check for cached summary text and audio
+        const hasCachedSummary = metadata.summary && metadata.summaryLanguage === summaryLanguage;
+        const hasCachedAudio = await fileUtils.audioFileExists(summaryAudioId);
+
+        if (hasCachedSummary && hasCachedAudio) {
+            console.log(`[Summary] Serving cached summary and audio for doc ID: ${docId}`);
+            summary = metadata.summary;
+            wavBuffer = await fileUtils.readAudioFile(summaryAudioId);
+        } else {
+            // Get document text for summary generation
+            const text = metadata.text || await fileUtils.getAITextByDocId(docId);
+            
+            if (!text) {
+                return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
             }
-        }
 
-        // Generate summary
-        console.log(`[Summary] Generating summary for doc ID: ${docId}`);
-        summary = await geminiService.generateSummary(text, language || 'en');
+            // Generate summary (default to French)
+            console.log(`[Summary] Generating summary for doc ID: ${docId}`);
+            summary = await geminiService.generateSummary(text, summaryLanguage);
 
-        // Generate audio if not cached
-        if (!wavBuffer) {
-            console.log(`[Summary] Generating audio from summary for doc ID: ${docId}`);
-            const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-            wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-            await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
-            console.log(`[Summary] Saved summary audio cache for doc ID: ${docId}`);
+            // Cache summary in metadata
+            metadata.summary = summary;
+            metadata.summaryLanguage = summaryLanguage;
+            metadata.summaryTimestamp = new Date().toISOString();
+            await fileUtils.saveDocumentMetadata(metadata);
+
+            // Generate audio if not cached (use French voice)
+            // Priority: Local TTS (offline) > Edge TTS > Gemini TTS
+            if (!hasCachedAudio) {
+                console.log(`[Summary] Generating audio from summary for doc ID: ${docId}`);
+                try {
+                    // Try local TTS first (works offline, good for localhost)
+                    if (process.platform === 'win32') {
+                        wavBuffer = await localTTSService.generateTTSLocal(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
+                        console.log(`[Summary] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
+                    } else {
+                        throw new Error('Local TTS not available on this platform');
+                    }
+                } catch (localTtsError) {
+                    console.warn(`[Summary] Local TTS failed, trying Edge TTS:`, localTtsError.message);
+                    try {
+                        // Try Edge TTS for better French voice quality
+                        const edgeTTSService = require('../services/edgeTTSService');
+                        wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
+                        console.log(`[Summary] Generated audio using Edge TTS (${summaryLanguage})`);
+                    } catch (edgeError) {
+                        console.warn(`[Summary] Edge TTS failed, trying Gemini TTS:`, edgeError.message);
+                        // Fallback to Gemini TTS
+                        try {
+                            const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+                            wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+                            console.log(`[Summary] Generated audio using Gemini TTS`);
+                        } catch (geminiError) {
+                            // If all fail, throw error
+                            throw new Error(`All TTS services failed. Local: ${localTtsError.message}, Edge: ${edgeError.message}, Gemini: ${geminiError.message}`);
+                        }
+                    }
+                }
+                await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
+                console.log(`[Summary] Saved summary audio cache for doc ID: ${docId}`);
+            } else {
+                wavBuffer = await fileUtils.readAudioFile(summaryAudioId);
+            }
         }
 
         res.json({
@@ -188,7 +195,7 @@ async function summarizeDocument(req, res) {
             summary: summary,
             audioData: wavBuffer.toString('base64'),
             mimeType: 'audio/wav',
-            originalLength: text.length,
+            originalLength: metadata.length || metadata.text?.length || 0,
             summaryLength: summary.length,
             type: 'summary',
             timestamp: new Date().toISOString()
@@ -208,48 +215,94 @@ async function summarizeDocument(req, res) {
  */
 async function generateSummaryAudio(req, res) {
     try {
+        // Document ID and language validation handled by middleware
         const { docId } = req.params;
         const { language } = req.query; // Optional language parameter (en, fr, etc.)
 
-        if (!docId) {
-            return res.status(400).json({ error: 'Document ID is required' });
+        // Get document metadata
+        const metadata = await fileUtils.getDocumentMetadata(docId);
+        if (!metadata) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        // Default to French for summaries
+        const summaryLanguage = language || 'fr';
+        
+        // Check if we have cached audio that matches the requested language
+        const summaryAudioId = `${docId}${constants.AUDIO_PREFIXES.SUMMARY}`;
+        const hasCachedAudio = await fileUtils.audioFileExists(summaryAudioId);
+        const cachedAudioLanguageMatches = metadata.summaryLanguage === summaryLanguage;
+        
+        // Only serve cached audio if it matches the requested language
+        if (hasCachedAudio && cachedAudioLanguageMatches && metadata.summary) {
+            console.log(`[Summary Audio] Serving cached audio for doc ID: ${docId} (language: ${summaryLanguage})`);
+            const fileBuffer = await fileUtils.readAudioFile(summaryAudioId);
+            return res.json({
+                audioData: fileBuffer.toString('base64'),
+                mimeType: 'audio/wav',
+                docId: docId,
+                summary: metadata.summary,
+                type: 'summary'
+            });
         }
 
         // Get document text
-        const text = await fileUtils.getAITextByDocId(docId);
-
+        const text = metadata.text || await fileUtils.getAITextByDocId(docId);
         if (!text) {
-            return res.status(404).json({ error: 'Document not found' });
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+        
+        // Generate summary (use cached if available and same language)
+        let summary = metadata.summary && metadata.summaryLanguage === summaryLanguage
+            ? metadata.summary
+            : await geminiService.generateSummary(text, summaryLanguage);
+
+        // Cache summary if not already cached or language changed
+        if (!metadata.summary || metadata.summaryLanguage !== summaryLanguage) {
+            metadata.summary = summary;
+            metadata.summaryLanguage = summaryLanguage;
+            metadata.summaryTimestamp = new Date().toISOString();
+            await fileUtils.saveDocumentMetadata(metadata);
         }
 
-        // Check for cached summary audio (use a different ID to distinguish from full document audio)
-        const summaryAudioId = `${docId}-summary`;
+        // Generate TTS audio from summary (regenerate if language mismatch or not cached)
+        // Priority: Local TTS (offline) > Edge TTS > Gemini TTS
+        let wavBuffer;
+        const ttsLanguage = summaryLanguage === 'fr' ? 'fr-FR' : 
+                           summaryLanguage === 'en' ? 'en-US' : 
+                           summaryLanguage === 'es' ? 'es-ES' :
+                           summaryLanguage === 'de' ? 'de-DE' :
+                           summaryLanguage === 'it' ? 'it-IT' :
+                           summaryLanguage === 'pt' ? 'pt-BR' : 'fr-FR';
         
-        if (fileUtils.audioFileExists(summaryAudioId)) {
-            console.log(`[Summary Audio] Serving cached audio for doc ID: ${docId}`);
+        try {
+            // Try local TTS first (works offline, good for localhost)
+            if (process.platform === 'win32') {
+                wavBuffer = await localTTSService.generateTTSLocal(summary, ttsLanguage);
+                console.log(`[Summary Audio] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
+            } else {
+                throw new Error('Local TTS not available on this platform');
+            }
+        } catch (localTtsError) {
+            console.warn(`[Summary Audio] Local TTS failed, trying Edge TTS:`, localTtsError.message);
             try {
-                const fileBuffer = await fileUtils.readAudioFile(summaryAudioId);
-                return res.json({
-                    audioData: fileBuffer.toString('base64'),
-                    mimeType: 'audio/wav',
-                    docId: docId,
-                    type: 'summary'
-                });
-            } catch (error) {
-                console.warn(`[Summary Audio] Failed to read cached file, regenerating. Error: ${error.message}`);
-                // Fall through to regeneration
+                // Try Edge TTS for better voice quality
+                const edgeTTSService = require('../services/edgeTTSService');
+                wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, ttsLanguage);
+                console.log(`[Summary Audio] Generated audio using Edge TTS (${summaryLanguage})`);
+            } catch (edgeError) {
+                console.warn(`[Summary Audio] Edge TTS failed, trying Gemini TTS:`, edgeError.message);
+                // Fallback to Gemini TTS
+                try {
+                    const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+                    wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+                    console.log(`[Summary Audio] Generated audio using Gemini TTS`);
+                } catch (geminiError) {
+                    // If all fail, throw error
+                    throw new Error(`All TTS services failed. Local: ${localTtsError.message}, Edge: ${edgeError.message}, Gemini: ${geminiError.message}`);
+                }
             }
         }
-
-        // Generate summary
-        console.log(`[Summary Audio] Generating summary and audio for doc ID: ${docId}`);
-        const summary = await geminiService.generateSummary(text, language || 'en');
-
-        // Generate TTS audio from summary
-        const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-
-        // Convert PCM to WAV and save
-        const wavBuffer = audioUtils.pcmToWav(pcmBuffer);
         await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
 
         console.log(`[Summary Audio] Saved audio cache for doc ID: ${docId}`);
@@ -273,9 +326,9 @@ async function generateSummaryAudio(req, res) {
 }
 
 module.exports = {
-    extractText,
     createDocument,
     getAllDocuments,
+    getDocumentFile,
     summarizeDocument,
     generateSummaryAudio,
 };

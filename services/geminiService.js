@@ -52,12 +52,30 @@ async function generateText(query, systemPrompt = null, useGoogleSearch = true) 
  * @param {string} language - Language for the summary (default: 'en' for English)
  * @returns {Promise<string>} Generated summary
  */
-async function generateSummary(text, language = 'en') {
-    const systemPrompt = language === 'fr' 
-        ? 'Vous êtes un assistant expert en résumé de documents. Créez un résumé concis et complet du texte fourni, en mettant en évidence les points clés et les informations importantes.'
-        : 'You are an expert document summarization assistant. Create a concise and comprehensive summary of the provided text, highlighting key points and important information.';
-
-    const query = `Please summarize the following text:\n\n${text}`;
+async function generateSummary(text, language = 'fr') {
+    let systemPrompt;
+    let query;
+    
+    if (language === 'fr') {
+        systemPrompt = 'Vous êtes un assistant expert en résumé de documents. Créez un résumé concis et complet du texte fourni, en mettant en évidence les points clés et les informations importantes. Répondez UNIQUEMENT en français.';
+        query = `Résumez le texte suivant de manière concise et complète:\n\n${text}`;
+    } else if (language === 'es') {
+        systemPrompt = 'Eres un asistente experto en resumen de documentos. Crea un resumen conciso y completo del texto proporcionado, destacando los puntos clave y la información importante. Responde SOLO en español.';
+        query = `Resume el siguiente texto de manera concisa y completa:\n\n${text}`;
+    } else if (language === 'de') {
+        systemPrompt = 'Sie sind ein Experten-Assistent für Dokumentenzusammenfassung. Erstellen Sie eine prägnante und umfassende Zusammenfassung des bereitgestellten Texts, wobei Sie die wichtigsten Punkte und Informationen hervorheben. Antworten Sie NUR auf Deutsch.';
+        query = `Fassen Sie den folgenden Text prägnant und umfassend zusammen:\n\n${text}`;
+    } else if (language === 'it') {
+        systemPrompt = 'Sei un assistente esperto nella sintesi di documenti. Crea un riassunto conciso e completo del testo fornito, evidenziando i punti chiave e le informazioni importanti. Rispondi SOLO in italiano.';
+        query = `Riassumi il seguente testo in modo conciso e completo:\n\n${text}`;
+    } else if (language === 'pt') {
+        systemPrompt = 'Você é um assistente especializado em resumo de documentos. Crie um resumo conciso e completo do texto fornecido, destacando os pontos-chave e informações importantes. Responda APENAS em português.';
+        query = `Resuma o seguinte texto de forma concisa e completa:\n\n${text}`;
+    } else {
+        // Default to English
+        systemPrompt = 'You are an expert document summarization assistant. Create a concise and comprehensive summary of the provided text, highlighting key points and important information. Respond ONLY in English.';
+        query = `Please summarize the following text:\n\n${text}`;
+    }
 
     // Don't use Google Search for summaries - only use the document content
     return await generateText(query, systemPrompt, false);
