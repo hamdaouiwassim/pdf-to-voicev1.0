@@ -38,17 +38,36 @@
         <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 fade-in">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
                 <i class="fas fa-cloud-upload-alt text-blue-500 mr-3"></i>
-                Upload PDF Document
+                Upload Course Documents
             </h2>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>Required:</strong> Upload two PDFs - one with text content (for TTS) and one for presentation (for display). The TTS will be synchronized with the presentation PDF pages.
+                </p>
+            </div>
             
-            <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
-                <input type="file" id="inpFile" accept=".pdf" class="hidden">
-                <label for="inpFile" class="cursor-pointer">
-                    <i class="fas fa-file-pdf text-6xl text-red-500 mb-4"></i>
-                    <p class="text-gray-600 mb-2">Click to select a PDF file</p>
-                    <p class="text-sm text-gray-400">Maximum file size: 10MB</p>
-                </label>
-                <div id="fileName" class="mt-4 text-blue-600 font-medium hidden"></div>
+            <div class="space-y-4">
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+                    <input type="file" id="inpTextFile" accept=".pdf" class="hidden">
+                    <label for="inpTextFile" class="cursor-pointer">
+                        <i class="fas fa-file-alt text-4xl text-green-500 mb-2"></i>
+                        <p class="text-gray-700 font-medium mb-1">Text PDF (for TTS)</p>
+                        <p class="text-sm text-gray-500">PDF containing the full text content for voice synthesis</p>
+                    </label>
+                    <div id="textFileName" class="mt-2 text-green-600 font-medium text-sm hidden"></div>
+                </div>
+
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+                    <input type="file" id="inpVisualFile" accept=".pdf" class="hidden">
+                    <label for="inpVisualFile" class="cursor-pointer">
+                        <i class="fas fa-file-image text-4xl text-purple-500 mb-2"></i>
+                        <p class="text-gray-700 font-medium mb-1">Presentation PDF (for display)</p>
+                        <p class="text-sm text-gray-500">PDF to be shown to users during the course</p>
+                    </label>
+                    <div id="visualFileName" class="mt-2 text-purple-600 font-medium text-sm hidden"></div>
+                </div>
             </div>
 
             <button 
@@ -158,10 +177,12 @@
     </div>
 
     <script>
-        const inpFile = document.getElementById("inpFile");
+        const inpTextFile = document.getElementById("inpTextFile");
+        const inpVisualFile = document.getElementById("inpVisualFile");
         const btnUpload = document.getElementById("btnUpload");
         const result = document.getElementById("result");
-        const fileName = document.getElementById("fileName");
+        const textFileName = document.getElementById("textFileName");
+        const visualFileName = document.getElementById("visualFileName");
         const uploadLoading = document.getElementById("uploadLoading");
         const uploadResult = document.getElementById("uploadResult");
         const uploadError = document.getElementById("uploadError");
@@ -180,23 +201,42 @@
 
         let currentDocId = null;
 
-        // File input change handler
-        inpFile.addEventListener("change", (e) => {
+        // Text PDF file input change handler
+        inpTextFile.addEventListener("change", (e) => {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
-                fileName.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-                fileName.classList.remove("hidden");
-                btnUpload.disabled = false;
+                textFileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                textFileName.classList.remove("hidden");
+                checkUploadReady();
             } else {
-                fileName.classList.add("hidden");
-                btnUpload.disabled = true;
+                textFileName.classList.add("hidden");
+                checkUploadReady();
             }
         });
 
+        // Visual PDF file input change handler
+        inpVisualFile.addEventListener("change", (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                visualFileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                visualFileName.classList.remove("hidden");
+                checkUploadReady();
+            } else {
+                visualFileName.classList.add("hidden");
+                checkUploadReady();
+            }
+        });
+
+        // Check if upload button should be enabled (both files required)
+        function checkUploadReady() {
+            btnUpload.disabled = !(inpTextFile.files.length > 0 && inpVisualFile.files.length > 0);
+        }
+
         // Upload button click handler
         btnUpload.addEventListener("click", async () => {
-            if (!inpFile.files[0]) {
-                showError("Please select a PDF file first");
+            // Both files are required
+            if (!inpTextFile.files[0] || !inpVisualFile.files[0]) {
+                showError("Please select both PDF files (text PDF and presentation PDF)");
                 return;
             }
 
@@ -207,7 +247,8 @@
             btnUpload.disabled = true;
 
             const formData = new FormData();
-            formData.append("pdfFile", inpFile.files[0]);
+            formData.append("textPdfFile", inpTextFile.files[0]);
+            formData.append("visualPdfFile", inpVisualFile.files[0]);
 
             try {
                 const response = await fetch("/api/documents", {
@@ -224,19 +265,27 @@
                 // Success
                 uploadLoading.classList.add("hidden");
                 uploadResult.classList.remove("hidden");
-                uploadResultDetails.innerHTML = `
+                
+                const detailsHtml = `
                     <strong>Document ID:</strong> ${data.docId}<br>
-                    <strong>Filename:</strong> ${data.filename}<br>
+                    <strong>Text PDF:</strong> ${data.textFilename || 'N/A'}<br>
+                    <strong>Presentation PDF:</strong> ${data.visualFilename || 'N/A'}<br>
+                    <strong>Text Pages:</strong> ${data.numPagesText || 0}<br>
+                    <strong>Presentation Pages:</strong> ${data.numPagesVisual || 0}<br>
                     <strong>Characters extracted:</strong> ${data.text?.length || 0}
                 `;
+                
+                uploadResultDetails.innerHTML = detailsHtml;
 
                 // Show extracted text
                 result.value = data.text || "No text extracted";
                 extractedTextSection.classList.remove("hidden");
 
-                // Clear file input
-                inpFile.value = "";
-                fileName.classList.add("hidden");
+                // Clear file inputs
+                inpTextFile.value = "";
+                inpVisualFile.value = "";
+                textFileName.classList.add("hidden");
+                visualFileName.classList.add("hidden");
                 btnUpload.disabled = true;
 
                 // Refresh documents list
@@ -244,6 +293,7 @@
             } catch (error) {
                 uploadLoading.classList.add("hidden");
                 showError(error.message);
+                btnUpload.disabled = false;
             }
         });
 

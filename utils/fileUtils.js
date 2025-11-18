@@ -19,6 +19,7 @@ function setupDirectories() {
 
 /**
  * Retrieves the plain text content from the saved JSON sidecar file.
+ * In dual mode, this returns the text from the text PDF (for TTS).
  * @param {string} docId - The ID prefix for the file.
  * @returns {Promise<string | null>} The document text or null if not found.
  */
@@ -28,7 +29,9 @@ async function getAITextByDocId(docId) {
         try {
             await fsPromises.access(jsonFilePath);
             const content = await fsPromises.readFile(jsonFilePath, 'utf8');
-            return JSON.parse(content).text;
+            const data = JSON.parse(content);
+            // Returns text from text PDF (for TTS) - always uses text PDF content
+            return data.text || null;
         } catch (accessError) {
             if (accessError.code === 'ENOENT') {
                 return null;
@@ -43,6 +46,10 @@ async function getAITextByDocId(docId) {
 
 /**
  * Gets document metadata by docId
+ * Returns full metadata including dual PDF mode information:
+ * - textFilename: "{docId}_text.pdf" (for TTS)
+ * - visualFilename: "{docId}_visual.pdf" (for display and word counting)
+ * - isDualMode: true/false
  * @param {string} docId - Document ID
  * @returns {Promise<Object | null>} Document metadata or null if not found
  */
@@ -77,6 +84,7 @@ async function saveDocumentMetadata(sidecarData) {
 
 /**
  * Gets all documents from the file system.
+ * Returns metadata including dual PDF mode information.
  * @returns {Promise<Array>} Array of document metadata
  */
 async function getAllDocuments() {
@@ -93,12 +101,30 @@ async function getAllDocuments() {
                             'utf8'
                         );
                         const data = JSON.parse(jsonContent);
-                        return {
+                        
+                        // Build document info with dual PDF support
+                        const docInfo = {
                             id: data.id,
                             title: data.title,
                             length: data.length,
-                            filename: data.filename
+                            filename: data.filename, // Visual PDF filename (for backward compatibility)
+                            timestamp: data.timestamp
                         };
+                        
+                        // Add dual PDF mode information if available
+                        if (data.isDualMode) {
+                            docInfo.isDualMode = true;
+                            docInfo.textFilename = data.textFilename; // {docId}_text.pdf
+                            docInfo.visualFilename = data.visualFilename; // {docId}_visual.pdf
+                            docInfo.numPagesText = data.numPagesText;
+                            docInfo.numPagesVisual = data.numPagesVisual;
+                        } else {
+                            docInfo.isDualMode = false;
+                            // Legacy format: single PDF
+                            // filename already contains the PDF filename
+                        }
+                        
+                        return docInfo;
                     } catch (error) {
                         console.error(`[FS Error] Failed to read document ${f}:`, error.message);
                         return null;

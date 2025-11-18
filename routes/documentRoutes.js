@@ -18,5 +18,8 @@ router.get('/:docId/summary/audio', validation.validateDocId, validation.validat
 // GET /api/documents/:docId/summary - Summarize a document
 router.get('/:docId/summary', validation.validateDocId, validation.validateLanguage, documentController.summarizeDocument);
 
+// GET /api/documents/:docId/page-timings - Get page timings for a document
+router.get('/:docId/page-timings', validation.validateDocId, documentController.getPageTimings);
+
 module.exports = router;
 

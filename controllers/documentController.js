@@ -9,43 +9,74 @@ const config = require('../config/config');
 const constants = require('../utils/constants');
 const path = require('path');
 
+// PDF.js for page-by-page text extraction
+let pdfjsLib;
+try {
+    pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+} catch (err) {
+    // Fallback if pdfjs-dist is not installed
+    console.warn('[PDF.js] pdfjs-dist not installed, will use pdf-parse fallback');
+    pdfjsLib = null;
+}
+
 /**
  * Extract text from uploaded PDF and save metadata
- * POST /api/extract-text
+ * Requires both textPdfFile (for TTS) and visualPdfFile (for display)
+ * POST /api/documents
  */
 async function createDocument(req, res) {
     try {
         // File validation is handled by middleware (validateFileUpload)
-        // Additional validation only if needed
-        const pdfBuffer = req.files.pdfFile.data;
-        
+        // Both textPdfFile and visualPdfFile are required
+        const textPdfBuffer = req.files.textPdfFile.data;
+        const visualPdfBuffer = req.files.visualPdfFile.data;
+
         // Generate unique ID for the document
         const docId = crypto.randomUUID();
-        const filename = `${docId}${constants.FILE_EXTENSIONS.PDF}`;
-        const pdfFilePath = path.join(config.UPLOADS_DIR, filename);
 
-        // Parse PDF and save files in parallel for better performance
-        const [result] = await Promise.all([
-            pdfParse(pdfBuffer),
-            fsPromises.writeFile(pdfFilePath, pdfBuffer)
+        // Text PDF for TTS, Visual PDF for display
+        const textPdfFilename = `${docId}_text${constants.FILE_EXTENSIONS.PDF}`;
+        const visualPdfFilename = `${docId}_visual${constants.FILE_EXTENSIONS.PDF}`;
+        
+        const textPdfPath = path.join(config.UPLOADS_DIR, textPdfFilename);
+        const visualPdfPath = path.join(config.UPLOADS_DIR, visualPdfFilename);
+
+        // Parse both PDFs and save files in parallel
+        const [textResult, visualResult] = await Promise.all([
+            pdfParse(textPdfBuffer),
+            pdfParse(visualPdfBuffer),
+            fsPromises.writeFile(textPdfPath, textPdfBuffer),
+            fsPromises.writeFile(visualPdfPath, visualPdfBuffer)
         ]);
+
+        const title = req.files.visualPdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, '');
 
         // Create and save JSON sidecar file
         const sidecarData = {
             id: docId,
-            title: req.files.pdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, ''),
-            text: result.text,
-            filename: filename,
-            length: result.text.length,
+            title: title,
+            text: textResult.text, // Text from text PDF (for TTS)
+            filename: visualPdfFilename, // Visual PDF filename (for display)
+            textFilename: textPdfFilename, // Text PDF filename
+            visualFilename: visualPdfFilename, // Visual PDF filename
+            length: textResult.text.length,
+            numPagesText: textResult.numpages || 1, // Number of pages in text PDF
+            numPagesVisual: visualResult.numpages || 1, // Number of pages in visual PDF
+            isDualMode: true, // Always true now
             timestamp: new Date().toISOString()
         };
 
         await fileUtils.saveDocumentMetadata(sidecarData);
 
         res.json({
-            text: result.text,
+            text: textResult.text,
             docId: docId,
-            filename: filename
+            filename: visualPdfFilename, // Visual PDF for display
+            textFilename: textPdfFilename,
+            visualFilename: visualPdfFilename,
+            isDualMode: true,
+            numPagesText: sidecarData.numPagesText,
+            numPagesVisual: sidecarData.numPagesVisual
         });
     } catch (err) {
         console.error("Error parsing PDF:", err.message);
@@ -76,13 +107,39 @@ async function getAllDocuments(req, res) {
 
 /**
  * Get PDF file by document ID
- * GET /api/documents/:docId/file
+ * Returns visual PDF by default (for display), or text PDF if requested
+ * GET /api/documents/:docId/file?type=visual|text
  */
 async function getDocumentFile(req, res) {
     try {
         // Document ID validation is handled by middleware (validateDocId)
         const { docId } = req.params;
-        const pdfFilePath = path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.PDF}`);
+        const { type = 'visual' } = req.query; // 'visual' or 'text', default to 'visual'
+
+        // Get document metadata
+        const metadata = await fileUtils.getDocumentMetadata(docId);
+        if (!metadata) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        let pdfFilePath;
+        let filename;
+
+        // Support both new format (dual mode) and legacy format (backward compatibility)
+        if (metadata.isDualMode && metadata.textFilename && metadata.visualFilename) {
+            // New format: dual PDF mode
+            if (type === 'text') {
+                pdfFilePath = path.join(config.UPLOADS_DIR, metadata.textFilename);
+                filename = metadata.textFilename;
+            } else {
+                pdfFilePath = path.join(config.UPLOADS_DIR, metadata.visualFilename);
+                filename = metadata.visualFilename;
+            }
+        } else {
+            // Legacy format: single PDF (backward compatibility for old documents)
+            pdfFilePath = path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.PDF}`);
+            filename = metadata.filename || `${docId}${constants.FILE_EXTENSIONS.PDF}`;
+        }
 
         // Check if file exists (async)
         if (!(await fileUtils.fileExists(pdfFilePath))) {
@@ -91,7 +148,7 @@ async function getDocumentFile(req, res) {
 
         // Set appropriate headers and send file
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${docId}${constants.FILE_EXTENSIONS.PDF}"`);
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
         res.sendFile(path.resolve(pdfFilePath));
     } catch (error) {
         console.error("[Document File Error]:", error);
@@ -325,11 +382,238 @@ async function generateSummaryAudio(req, res) {
     }
 }
 
+/**
+ * Get page timings for a document
+ * GET /api/documents/:docId/page-timings
+ * Returns array of page numbers with cumulative time in seconds
+ */
+async function getPageTimings(req, res) {
+    try {
+        // Document ID validation is handled by middleware (validateDocId)
+        const { docId } = req.params;
+
+        // Get document metadata first to check if dual mode
+        const metadata = await fileUtils.getDocumentMetadata(docId);
+        if (!metadata) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        // Use VISUAL PDF ONLY for word counting and page timings
+        // This ensures timings are based on what the user sees (presentation PDF)
+        // In dual mode: visualFilename = "{docId}_visual.pdf" (for counting words)
+        //              textFilename = "{docId}_text.pdf" (for TTS, NOT used here)
+        // Support both new format (dual mode) and legacy format (backward compatibility)
+        let visualPdfPath;
+        
+        if (metadata.isDualMode && metadata.textFilename && metadata.visualFilename) {
+            // New format: dual PDF mode - use visual PDF ({docId}_visual.pdf) for counting
+            visualPdfPath = path.join(config.UPLOADS_DIR, metadata.visualFilename);
+            console.log(`[Page Timings] Using VISUAL PDF for word counting: ${metadata.visualFilename}`);
+        } else {
+            // Legacy format: single PDF (backward compatibility for old documents)
+            visualPdfPath = path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.PDF}`);
+        }
+
+   
+        // Check if files exist
+        if (!(await fileUtils.fileExists(visualPdfPath))) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        // Parse VISUAL PDF and extract text page by page (NOT the text PDF)
+        // This ensures word counts match what the user sees on screen
+        const visualPdfBuffer = await fsPromises.readFile(visualPdfPath);
+        
+        // Extract full text first to check for "next slide" markers
+        // Priority: "next slide" markers > PDF page extraction
+        const visualPdfData = await pdfParse(visualPdfBuffer);
+        const fullVisualText = visualPdfData.text || '';
+        
+        // Check if text contains "next slide" markers to divide pages/slides
+        const nextSlideMarker = /next\s+slide/gi;
+        const hasSlideMarkers = nextSlideMarker.test(fullVisualText);
+        
+        // Text to exclude from word count (e.g., "Titan Academy")
+        const excludeFromCount = /titan\s+academy/gi;
+        
+        /**
+         * Count words in text, excluding specified phrases
+         * @param {string} text - Text to count words in
+         * @returns {number} Word count
+         */
+        function countWordsExcluding(text) {
+            if (!text || typeof text !== 'string') return 0;
+            // Remove excluded phrases first
+            let cleanedText = text.replace(excludeFromCount, ' ');
+            // Split by whitespace and filter empty strings
+            const words = cleanedText.trim().split(/\s+/).filter(word => word.length > 0);
+            return words.length;
+        }
+        
+        let pageWordCounts = [];
+        let numPages = 1;
+        
+        if (hasSlideMarkers) {
+            // Priority 1: Split text by "next slide" markers - each segment is a slide
+            // This provides accurate slide division based on explicit markers
+            const slideSegments = fullVisualText.split(nextSlideMarker);
+            
+            // Each segment represents content for one slide
+            let currentPageNum = 1;
+            slideSegments.forEach((segment) => {
+                const cleanedSegment = segment.trim();
+                
+                if (cleanedSegment.length > 0) {
+                    // Count words excluding "Titan Academy" and "next slide" marker
+                    const wordCount = countWordsExcluding(cleanedSegment);
+                    pageWordCounts.push({
+                        page: currentPageNum,
+                        wordCount: wordCount,
+                        text: cleanedSegment
+                    });
+                    currentPageNum++;
+                }
+            });
+            
+            // Update numPages to match actual slide count
+            numPages = pageWordCounts.length || 1;
+            console.log(`[Page Timings] Found ${numPages} slides based on "next slide" markers`);
+        } else {
+            // Priority 2: No "next slide" markers - use PDF page extraction (pdfjs-dist or fallback)
+            // Try to use pdfjs-dist for page-by-page extraction
+            if (pdfjsLib) {
+                try {
+                    const loadingTask = pdfjsLib.getDocument({ data: visualPdfBuffer });
+                    const pdfDocument = await loadingTask.promise;
+                    numPages = pdfDocument.numPages;
+
+                    // Extract text from each page
+                    const pagePromises = [];
+                    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                        pagePromises.push(
+                            pdfDocument.getPage(pageNum).then(async (page) => {
+                                const textContent = await page.getTextContent();
+                                // Extract text from text items
+                                const pageText = textContent.items
+                                    .map(item => item.str)
+                                    .join(' ')
+                                    .trim();
+                                
+                                // Remove "next slide" if present (not counted in words)
+                                let cleanedText = pageText.replace(nextSlideMarker, ' ').trim();
+                                
+                                // Count words excluding "Titan Academy"
+                                const wordCount = countWordsExcluding(cleanedText);
+                                
+                                // Also remove "Titan Academy" from text for display
+                                cleanedText = cleanedText.replace(excludeFromCount, ' ').trim();
+                                
+                                return {
+                                    page: pageNum,
+                                    wordCount: wordCount,
+                                    text: cleanedText
+                                };
+                            })
+                        );
+                    }
+
+                    pageWordCounts = await Promise.all(pagePromises);
+                } catch (pdfjsError) {
+                    console.warn('[Page Timings] PDF.js extraction failed, using pdf-parse fallback:', pdfjsError.message);
+                    // Fallback continues below
+                }
+            }
+            
+            // Fallback: use estimated distribution based on PDF pages
+            if (pageWordCounts.length === 0) {
+                numPages = visualPdfData.numpages || 1;
+                
+                // Create page word counts (estimated distribution)
+                // Note: We need to exclude "Titan Academy" from the word count
+                // Split the full text by "Titan Academy" first to get accurate word counts
+                const textWithoutExcluded = fullVisualText.replace(excludeFromCount, ' ').trim();
+                const allWordsArray = textWithoutExcluded.split(/\s+/).filter(word => word.length > 0);
+                const totalWordsExcluded = allWordsArray.length;
+                const avgWordsPerPage = numPages > 0 ? Math.ceil(totalWordsExcluded / numPages) : 0;
+                
+                for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                    const startIndex = (pageNum - 1) * avgWordsPerPage;
+                    const endIndex = pageNum === numPages ? totalWordsExcluded : pageNum * avgWordsPerPage;
+                    const pageWords = allWordsArray.slice(startIndex, endIndex);
+                    const pageText = pageWords.join(' ');
+                    pageWordCounts.push({
+                        page: pageNum,
+                        wordCount: endIndex - startIndex,
+                        text: pageText
+                    });
+                }
+            }
+        }
+
+        // Calculate timings based on reading/speaking speed
+        // Pages are in LANDSCAPE mode (more content per page than portrait)
+        // Average reading speed: 150-200 words per minute (WPM)
+        // Average speaking speed for TTS: ~150 words per minute
+        // Using 150 WPM = 2.5 words per second
+        // Note: Landscape pages typically have more words, but we count actual words per page
+        // so the calculation automatically accounts for landscape layout
+        const wordsPerMinute = 150;
+        const wordsPerSecond = wordsPerMinute / 60; // ~2.5 words/sec
+
+        // Generate page timings array (cumulative) based on actual word counts per page
+        // Sort by page number to ensure correct order
+        pageWordCounts.sort((a, b) => a.page - b.page);
+        
+        const pageTimings = [];
+        let cumulativeTime = 0;
+
+        for (const pageData of pageWordCounts) {
+            const pageNum = pageData.page;
+            const wordCount = pageData.wordCount;
+            const pageText = pageData.text || '';
+            
+            if (pageNum === 1) {
+                // First page starts at 0
+                pageTimings.push({ 
+                    page: 1, 
+                    time: 0,  // Début de la page 1
+                    wordCount: wordCount,
+                    text: pageText
+                });
+                // Calculate time for first page
+                const secondsForPage = wordCount / wordsPerSecond;
+                cumulativeTime = secondsForPage; // Temps de fin de la page 1
+            } else {
+                // Le temps retourné est le DÉBUT de cette page (= fin de la page précédente)
+                // On retourne cumulativeTime AVANT d'ajouter le temps de la page courante
+                pageTimings.push({ 
+                    page: pageNum, 
+                    time: Math.round(cumulativeTime * 10) / 10, // Temps de début de cette page
+                    wordCount: wordCount,
+                    text: pageText
+                });
+                // Puis on ajoute le temps de cette page pour la suivante
+                const secondsForPage = wordCount / wordsPerSecond;
+                cumulativeTime += secondsForPage; // Temps de fin de cette page
+            }
+        }
+
+        res.json(pageTimings);
+    } catch (error) {
+        console.error("[Page Timings Error]:", error);
+        res.status(500).json({ 
+            error: 'Failed to calculate page timings.',
+            details: error.message 
+        });
+    }
+}
+
 module.exports = {
     createDocument,
     getAllDocuments,
     getDocumentFile,
     summarizeDocument,
     generateSummaryAudio,
+    getPageTimings,
 };
 

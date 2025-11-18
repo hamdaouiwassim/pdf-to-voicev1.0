@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice - Document Titan Academy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            color: #333;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .invoice-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .invoice-header {
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .invoice-header h1 {
+            font-size: 32px;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .invoice-header p {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .invoice-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        
+        .bill-to, .invoice-details {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .bill-to h3, .invoice-details h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 16px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        .bill-to p, .invoice-details p {
+            margin: 5px 0;
+            color: #555;
+        }
+        
+        .project-details {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        
+        .project-details h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .project-details ul {
+            margin-left: 20px;
+            color: #555;
+        }
+        
+        .services-section {
+            margin-bottom: 30px;
+        }
+        
+        .developer-card {
+            background: #fff;
+            border: 2px solid #3498db;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .developer-card h4 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .developer-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .info-item {
+            margin: 5px 0;
+        }
+        
+        .info-item strong {
+            color: #2c3e50;
+        }
+        
+        .responsibilities {
+            margin-top: 15px;
+        }
+        
+        .responsibilities h5 {
+            color: #555;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .responsibilities ul {
+            margin-left: 20px;
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .cost-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            background: white;
+        }
+        
+        .cost-table th {
+            background: #3498db;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .cost-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .cost-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .cost-table tr:last-child {
+            background: #2c3e50;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .cost-table .total-row {
+            background: #2c3e50;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .payment-terms {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 5px;
+        }
+        
+        .payment-terms h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+        
+        .deliverables {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 5px;
+        }
+        
+        .deliverables h3 {
+            color: #155724;
+            margin-bottom: 15px;
+        }
+        
+        .deliverables ul {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        .deliverables li {
+            padding: 8px 0;
+            color: #155724;
+        }
+        
+        .deliverables li:before {
+            content: "✅ ";
+            margin-right: 10px;
+        }
+        
+        .metrics {
+            background: #e7f3ff;
+            border-left: 4px solid #0066cc;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 5px;
+        }
+        
+        .metrics h3 {
+            color: #004085;
+            margin-bottom: 15px;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .metric-item {
+            background: white;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        
+        .metric-item strong {
+            color: #004085;
+        }
+        
+        .signature {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+            text-align: right;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .invoice-container {
+                box-shadow: none;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <div class="invoice-header">
+            <h1>INVOICE</h1>
+            <p><strong>Invoice Number:</strong> INV-2025-001</p>
+            <p><strong>Date:</strong> November 2025</p>
+            <p><strong>Project:</strong> Document Titan Academy - Development Services</p>
+        </div>
+        
+        <div class="invoice-info">
+            <div class="invoice-details">
+                <h3>INVOICE DETAILS</h3>
+                <p><strong>Project Period:</strong> 10 Days</p>
+                <p><strong>Invoice Date:</strong> November 2025</p>
+            </div>
+        </div>
+        
+        <div class="project-details">
+            <h3>PROJECT DETAILS</h3>
+            <p><strong>Project Name:</strong> Document Titan Academy</p>
+            <p><strong>Description:</strong> Full-stack web application development including:</p>
+            <ul>
+                <li>Backend API development (Node.js/Express)</li>
+                <li>Frontend application development (React/Three.js)</li>
+                <li>AI integration (Google Gemini, Groq, Hugging Face)</li>
+                <li>Text-to-Speech implementation</li>
+                <li>3D avatar integration</li>
+                <li>PDF processing and document management</li>
+                <li>Performance optimization and caching implementation</li>
+            </ul>
+        </div>
+        
+        <div class="services-section">
+            <h3 style="color: #2c3e50; margin-bottom: 20px; font-size: 20px;">SERVICES PROVIDED</h3>
+            
+            <div class="developer-card">
+                <h4>Hamdaoui Wassim - Senior Full-Stack Developer</h4>
+                <div class="developer-info">
+                    <div class="info-item"><strong>Role:</strong> Lead Developer / Technical Architect</div>
+                    <div class="info-item"><strong>Daily Rate:</strong> 300 DT</div>
+                    <div class="info-item"><strong>Days Worked:</strong> 10 days</div>
+                    <div class="info-item"><strong>Total Hours:</strong> 80 hours (8 hours/day)</div>
+                </div>
+                <div class="responsibilities">
+                    <h5>Responsibilities:</h5>
+                    <ul>
+                        <li>System architecture design and implementation</li>
+                        <li>Backend API development and optimization</li>
+                        <li>AI service integration and configuration</li>
+                        <li>Performance optimization and caching strategies</li>
+                        <li>Code quality improvements and refactoring</li>
+                        <li>Technical documentation</li>
+                    </ul>
+                </div>
+                <div style="text-align: right; margin-top: 15px; font-size: 18px; font-weight: bold; color: #2c3e50;">
+                    Subtotal: 3,000 DT
+                </div>
+            </div>
+            
+            <div class="developer-card">
+                <h4>Dabbebi Choâib - Full-Stack & Mobile Developer</h4>
+                <div class="developer-info">
+                    <div class="info-item"><strong>Role:</strong> Frontend Developer / Mobile Developer / UI/UX Implementation</div>
+                    <div class="info-item"><strong>Daily Rate:</strong> 200 DT</div>
+                    <div class="info-item"><strong>Days Worked:</strong> 10 days</div>
+                    <div class="info-item"><strong>Total Hours:</strong> 80 hours (8 hours/day)</div>
+                </div>
+                <div class="responsibilities">
+                    <h5>Responsibilities:</h5>
+                    <ul>
+                        <li>Frontend application development (React)</li>
+                        <li>Mobile application development (React Native / Flutter)</li>
+                        <li>3D avatar integration (Three.js)</li>
+                        <li>PDF viewer component implementation</li>
+                        <li>UI/UX design and implementation</li>
+                        <li>Frontend-backend integration</li>
+                        <li>Mobile-backend API integration</li>
+                        <li>User interface testing and optimization</li>
+                    </ul>
+                </div>
+                <div style="text-align: right; margin-top: 15px; font-size: 18px; font-weight: bold; color: #2c3e50;">
+                    Subtotal: 2,000 DT
+                </div>
+            </div>
+        </div>
+        
+        <table class="cost-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Description</th>
+                    <th>Quantity</th>
+                    <th>Rate</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Hamdaoui Wassim</td>
+                    <td>Senior Full-Stack Developer</td>
+                    <td>10 days</td>
+                    <td>300 DT/day</td>
+                    <td>3,000 DT</td>
+                </tr>
+                <tr>
+                    <td>Dabbebi Choâib</td>
+                    <td>Full-Stack & Mobile Developer</td>
+                    <td>10 days</td>
+                    <td>200 DT/day</td>
+                    <td>2,000 DT</td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="4" style="text-align: right;">TOTAL DUE</td>
+                    <td>5,000 DT</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="deliverables">
+            <h3>DELIVERABLES</h3>
+            <p>The following deliverables have been completed and delivered:</p>
+            <ul>
+                <li><strong>Backend API</strong> - RESTful API with Express.js, document processing, AI integration, TTS, caching system</li>
+                <li><strong>Frontend Application</strong> - React-based UI with 3D avatar, PDF viewer, interactive learning experience</li>
+                <li><strong>Mobile Application</strong> - Mobile app development (React Native / Flutter) with API integration</li>
+                <li><strong>Technical Documentation</strong> - Complete API docs, architecture docs, performance reports, setup guides</li>
+                <li><strong>Code Quality</strong> - Optimized performance (70% API reduction), async implementation, error handling</li>
+            </ul>
+        </div>
+        
+        <div class="metrics">
+            <h3>PROJECT METRICS</h3>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <strong>Total Development Time:</strong> 160 hours
+                </div>
+                <div class="metric-item">
+                    <strong>Project Duration:</strong> 10 days
+                </div>
+                <div class="metric-item">
+                    <strong>Lines of Code:</strong> 5,000+ lines
+                </div>
+                <div class="metric-item">
+                    <strong>API Endpoints:</strong> 9 endpoints
+                </div>
+                <div class="metric-item">
+                    <strong>Features Implemented:</strong> 15+ major features
+                </div>
+                <div class="metric-item">
+                    <strong>Performance Improvement:</strong> 70% API cost reduction
+                </div>
+            </div>
+        </div>
+        
+        <div class="signature">
+            <p><strong>Prepared By:</strong> Hamdaoui Wassim</p>
+            <p><strong>Date:</strong> November 2025</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Thank you for your business!</strong></p>
+            <p>For any questions regarding this invoice, please contact:</p>
+            <p><strong>Email:</strong> hamdaouiwassim@gmail.com | <strong>Phone:</strong> +216 92 045 389</p>
+            <p style="margin-top: 20px; font-style: italic;">This invoice is generated for the Document Titan Academy project development services.</p>
+        </div>
+    </div>
+</body>
+</html>
+
