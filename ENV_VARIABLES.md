@@ -164,12 +164,18 @@ These are **highly recommended** to avoid Google Gemini rate limits.
 ### Lip Sync / Rhubarb
 
 #### `RHUBARB_PATH`
-- **Default:** `<project>/api/bin/Rhubarb-Lip-Sync-1.14.0/rhubarb(.exe)` if present
+- **Default:** Auto-detected in this order:
+  1. Environment variable `RHUBARB_PATH` (if set)
+  2. Local libsync folder: `<project>/api/libsync/rhubarb(.exe)` (if exists)
+  3. Production Docker volume: `/var/lib/docker/volumes/rhubarb-lip-sync/rhubarb` (if exists)
+  4. Local bin directory: `<project>/api/bin/Rhubarb-Lip-Sync-1.14.0/rhubarb(.exe)` (if exists)
 - **Description:** Absolute path to the Rhubarb-Lip-Sync executable used to create mouth cue JSON files.
-- **When required:** When using the admin UI button “Lip Sync” to generate visemes for a course.
+- **When required:** When using the admin UI button "Lip Sync" to generate visemes for a course.
 - **Example (Windows):** `RHUBARB_PATH=C:\Tools\Rhubarb-Lip-Sync-1.14.0\rhubarb.exe`
 - **Example (macOS/Linux):** `RHUBARB_PATH=/usr/local/bin/rhubarb`
-- **Notes:** Download Rhubarb 1.14.0 from [https://github.com/DanielSWolf/rhubarb-lip-sync/releases](https://github.com/DanielSWolf/rhubarb-lip-sync/releases) and ensure the executable has run permission.
+- **Example (Production Docker Linux):** `RHUBARB_PATH=/var/lib/docker/volumes/rhubarb-lip-sync/rhubarb` (auto-detected if volume exists)
+- **Example (Production Docker Windows):** `RHUBARB_PATH=/var/lib/docker/volumes/rhubarb-lip-sync/rhubarb.exe` (auto-detected if volume exists)
+- **Notes:** Download Rhubarb 1.14.0 from [https://github.com/DanielSWolf/rhubarb-lip-sync/releases](https://github.com/DanielSWolf/rhubarb-lip-sync/releases) and ensure the executable has run permission. The production Docker volume path is automatically detected if present. On Linux servers, it will look for the Linux executable (`rhubarb`), and on Windows it will look for `rhubarb.exe`.
 
 ---
 

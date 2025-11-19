@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const dotenv = require('dotenv');
 
 // Load environment variables
@@ -32,7 +33,44 @@ const config = {
     TTS_VOICE_QA: 'Zephyr',
 
     // Lip Sync / Rhubarb configuration
-    RHUBARB_PATH: process.env.RHUBARB_PATH || path.join(__dirname, '..', 'bin', 'Rhubarb-Lip-Sync-1.14.0', process.platform === 'win32' ? 'rhubarb.exe' : 'rhubarb'),
+    RHUBARB_PATH: (() => {
+        // Check environment variable first
+        if (process.env.RHUBARB_PATH) {
+            return process.env.RHUBARB_PATH;
+        }
+        const isWindows = process.platform === 'win32';
+        const executableName = isWindows ? 'rhubarb.exe' : 'rhubarb';
+        
+        // Check local libsync folder (api/libsync/rhubarb)
+        const localLibsyncPath = path.join(__dirname, '..', 'libsync', executableName);
+        if (fs.existsSync(localLibsyncPath)) {
+            return localLibsyncPath;
+        }
+        
+        // Check production Docker volume path (prioritize platform-appropriate executable)
+        const dockerVolumeBase = '/var/lib/docker/volumes/rhubarb-lip-sync';
+        const possiblePaths = [
+            // Check build directory first (where compiled executables are typically located)
+            path.join(dockerVolumeBase, 'build', executableName),
+            path.join(dockerVolumeBase, 'build', 'Release', executableName),
+            path.join(dockerVolumeBase, 'build', 'Debug', executableName),
+            // Check root of volume
+            path.join(dockerVolumeBase, executableName),
+            // Check _data subdirectory
+            path.join(dockerVolumeBase, '_data', executableName),
+            // Then check the other platform's executable (for cross-platform setups)
+            path.join(dockerVolumeBase, 'build', isWindows ? 'rhubarb' : 'rhubarb.exe'),
+            path.join(dockerVolumeBase, isWindows ? 'rhubarb' : 'rhubarb.exe'),
+            path.join(dockerVolumeBase, '_data', isWindows ? 'rhubarb' : 'rhubarb.exe'),
+        ];
+        for (const dockerPath of possiblePaths) {
+            if (fs.existsSync(dockerPath)) {
+                return dockerPath;
+            }
+        }
+        // Fallback to local bin directory
+        return path.join(__dirname, '..', 'bin', 'Rhubarb-Lip-Sync-1.14.0', process.platform === 'win32' ? 'rhubarb.exe' : 'rhubarb');
+    })(),
 };
 
 // Validate required configuration
