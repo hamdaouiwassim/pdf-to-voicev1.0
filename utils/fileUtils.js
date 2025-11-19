@@ -2,6 +2,7 @@ const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
 const config = require('../config/config');
+const constants = require('./constants');
 
 /**
  * Ensures all necessary directories exist on server startup.
@@ -108,7 +109,9 @@ async function getAllDocuments() {
                             title: data.title,
                             length: data.length,
                             filename: data.filename, // Visual PDF filename (for backward compatibility)
-                            timestamp: data.timestamp
+                            timestamp: data.timestamp,
+                            courseName: data.courseName || data.title,
+                            courseDescription: data.courseDescription || ''
                         };
                         
                         // Add dual PDF mode information if available
@@ -191,6 +194,103 @@ async function saveAudioFile(audioId, audioBuffer) {
     await fsPromises.writeFile(audioFilePath, audioBuffer);
 }
 
+/**
+ * Get absolute path to an audio file.
+ * @param {string} audioId
+ * @returns {string}
+ */
+function getAudioFilePath(audioId) {
+    return path.join(config.AUDIOS_DIR, `${audioId}${constants.FILE_EXTENSIONS.WAV}`);
+}
+
+/**
+ * Get absolute path to a lip sync JSON file.
+ * @param {string} docId
+ * @returns {string}
+ */
+function getLipSyncFilePath(docId) {
+    return path.join(config.AUDIOS_DIR, `${docId}${constants.FILE_EXTENSIONS.JSON}`);
+}
+
+/**
+ * Check if lipsync JSON exists
+ * @param {string} docId
+ * @returns {Promise<boolean>}
+ */
+async function lipSyncFileExists(docId) {
+    const lipSyncPath = getLipSyncFilePath(docId);
+    try {
+        await fsPromises.access(lipSyncPath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Read lip sync JSON file.
+ * @param {string} docId
+ * @returns {Promise<Object|null>}
+ */
+async function readLipSyncFile(docId) {
+    const lipSyncPath = getLipSyncFilePath(docId);
+    try {
+        await fsPromises.access(lipSyncPath);
+        const content = await fsPromises.readFile(lipSyncPath, 'utf8');
+        return JSON.parse(content);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return null;
+        }
+        throw error;
+    }
+}
+
+/**
+ * Delete a document and all associated assets (PDFs, metadata, audio caches)
+ * @param {string} docId - Document ID
+ * @returns {Promise<boolean>} True if document existed and was removed, false if not found
+ */
+async function deleteDocumentAssets(docId) {
+    const metadata = await getDocumentMetadata(docId);
+
+    if (!metadata) {
+        return false;
+    }
+
+    const filesToDelete = [
+        path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.JSON}`)
+    ];
+
+    if (metadata.isDualMode && metadata.textFilename && metadata.visualFilename) {
+        filesToDelete.push(
+            path.join(config.UPLOADS_DIR, metadata.textFilename),
+            path.join(config.UPLOADS_DIR, metadata.visualFilename)
+        );
+    } else {
+        filesToDelete.push(path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.PDF}`));
+    }
+
+    const audioFiles = [
+        path.join(config.AUDIOS_DIR, `${docId}${constants.FILE_EXTENSIONS.WAV}`),
+        path.join(config.AUDIOS_DIR, `${docId}${constants.AUDIO_PREFIXES.SUMMARY}${constants.FILE_EXTENSIONS.WAV}`),
+        getLipSyncFilePath(docId)
+    ];
+
+    const deleteFile = async (filePath) => {
+        try {
+            await fsPromises.unlink(filePath);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                throw error;
+            }
+        }
+    };
+
+    await Promise.all([...filesToDelete, ...audioFiles].map(deleteFile));
+    return true;
+}
+
 module.exports = {
     setupDirectories,
     getAITextByDocId,
@@ -201,5 +301,10 @@ module.exports = {
     fileExists,
     readAudioFile,
     saveAudioFile,
+    getAudioFilePath,
+    getLipSyncFilePath,
+    lipSyncFileExists,
+    readLipSyncFile,
+    deleteDocumentAssets,
 };
 

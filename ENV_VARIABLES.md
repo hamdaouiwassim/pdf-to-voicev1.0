@@ -42,6 +42,11 @@ MAX_FILE_SIZE=10485760
 TTS_TEXT_LIMIT=4000
 
 # ===========================================
+# OPTIONAL - Lip Sync / Rhubarb
+# ===========================================
+RHUBARB_PATH=C:\\Tools\\Rhubarb-Lip-Sync-1.14.0\\rhubarb.exe
+
+# ===========================================
 # OPTIONAL - Development
 # ===========================================
 NODE_ENV=development
@@ -153,6 +158,18 @@ These are **highly recommended** to avoid Google Gemini rate limits.
 - **Default:** `4000`
 - **Description:** Maximum characters for TTS generation (text is truncated if longer)
 - **Example:** `TTS_TEXT_LIMIT=4000`
+
+---
+
+### Lip Sync / Rhubarb
+
+#### `RHUBARB_PATH`
+- **Default:** `<project>/api/bin/Rhubarb-Lip-Sync-1.14.0/rhubarb(.exe)` if present
+- **Description:** Absolute path to the Rhubarb-Lip-Sync executable used to create mouth cue JSON files.
+- **When required:** When using the admin UI button “Lip Sync” to generate visemes for a course.
+- **Example (Windows):** `RHUBARB_PATH=C:\Tools\Rhubarb-Lip-Sync-1.14.0\rhubarb.exe`
+- **Example (macOS/Linux):** `RHUBARB_PATH=/usr/local/bin/rhubarb`
+- **Notes:** Download Rhubarb 1.14.0 from [https://github.com/DanielSWolf/rhubarb-lip-sync/releases](https://github.com/DanielSWolf/rhubarb-lip-sync/releases) and ensure the executable has run permission.
 
 ---
 

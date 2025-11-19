@@ -30,6 +30,9 @@ const config = {
     TTS_TEXT_LIMIT: process.env.TTS_TEXT_LIMIT || 4000,
     TTS_VOICE_DOCUMENT: 'Kore',
     TTS_VOICE_QA: 'Zephyr',
+
+    // Lip Sync / Rhubarb configuration
+    RHUBARB_PATH: process.env.RHUBARB_PATH || path.join(__dirname, '..', 'bin', 'Rhubarb-Lip-Sync-1.14.0', process.platform === 'win32' ? 'rhubarb.exe' : 'rhubarb'),
 };
 
 // Validate required configuration

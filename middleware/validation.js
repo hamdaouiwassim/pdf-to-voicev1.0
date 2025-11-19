@@ -35,6 +35,8 @@ function validateFileUpload(req, res, next) {
 
     const textFile = req.files.textPdfFile;
     const visualFile = req.files.visualPdfFile;
+    const courseName = typeof req.body?.courseName === 'string' ? req.body.courseName.trim() : '';
+    const courseDescription = typeof req.body?.courseDescription === 'string' ? req.body.courseDescription.trim() : '';
 
     // Validate text PDF
     if (!config.ALLOWED_MIME_TYPES.includes(textFile.mimetype)) {
@@ -60,6 +62,21 @@ function validateFileUpload(req, res, next) {
     }
     if (!visualFile.name.toLowerCase().endsWith('.pdf')) {
         return res.status(400).json({ error: 'Visual PDF file must have .pdf extension' });
+    }
+
+    // Validate course metadata
+    if (!courseName) {
+        return res.status(400).json({ error: 'Course name is required' });
+    }
+    if (courseName.length > 150) {
+        return res.status(400).json({ error: 'Course name must be less than 150 characters' });
+    }
+
+    if (!courseDescription) {
+        return res.status(400).json({ error: 'Course description is required' });
+    }
+    if (courseDescription.length > 2000) {
+        return res.status(400).json({ error: 'Course description must be less than 2000 characters' });
     }
 
     next();

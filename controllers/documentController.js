@@ -5,6 +5,7 @@ const fileUtils = require('../utils/fileUtils');
 const audioUtils = require('../utils/audioUtils');
 const geminiService = require('../services/geminiService');
 const localTTSService = require('../services/localTTSService');
+const lipSyncService = require('../services/lipSyncService');
 const config = require('../config/config');
 const constants = require('../utils/constants');
 const path = require('path');
@@ -19,6 +20,23 @@ try {
     pdfjsLib = null;
 }
 
+async function ensureDocumentAudio(docId) {
+    const audioPath = fileUtils.getAudioFilePath(docId);
+    if (await fileUtils.audioFileExists(docId)) {
+        return audioPath;
+    }
+
+    const text = await fileUtils.getAITextByDocId(docId);
+    if (!text) {
+        throw new Error('Document content not found for audio generation.');
+    }
+
+    const { pcmBuffer } = await geminiService.generateTTS(text, config.TTS_VOICE_DOCUMENT);
+    const wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+    await fileUtils.saveAudioFile(docId, wavBuffer);
+    return audioPath;
+}
+
 /**
  * Extract text from uploaded PDF and save metadata
  * Requires both textPdfFile (for TTS) and visualPdfFile (for display)
@@ -30,6 +48,8 @@ async function createDocument(req, res) {
         // Both textPdfFile and visualPdfFile are required
         const textPdfBuffer = req.files.textPdfFile.data;
         const visualPdfBuffer = req.files.visualPdfFile.data;
+        const courseName = typeof req.body?.courseName === 'string' ? req.body.courseName.trim() : '';
+        const courseDescription = typeof req.body?.courseDescription === 'string' ? req.body.courseDescription.trim() : '';
 
         // Generate unique ID for the document
         const docId = crypto.randomUUID();
@@ -49,7 +69,8 @@ async function createDocument(req, res) {
             fsPromises.writeFile(visualPdfPath, visualPdfBuffer)
         ]);
 
-        const title = req.files.visualPdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, '');
+        const derivedTitle = req.files.visualPdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, '');
+        const title = courseName || derivedTitle;
 
         // Create and save JSON sidecar file
         const sidecarData = {
@@ -63,7 +84,9 @@ async function createDocument(req, res) {
             numPagesText: textResult.numpages || 1, // Number of pages in text PDF
             numPagesVisual: visualResult.numpages || 1, // Number of pages in visual PDF
             isDualMode: true, // Always true now
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            courseName: title,
+            courseDescription: courseDescription || null
         };
 
         await fileUtils.saveDocumentMetadata(sidecarData);
@@ -76,7 +99,10 @@ async function createDocument(req, res) {
             visualFilename: visualPdfFilename,
             isDualMode: true,
             numPagesText: sidecarData.numPagesText,
-            numPagesVisual: sidecarData.numPagesVisual
+            numPagesVisual: sidecarData.numPagesVisual,
+            title: sidecarData.title,
+            courseName: sidecarData.courseName,
+            courseDescription: sidecarData.courseDescription
         });
     } catch (err) {
         console.error("Error parsing PDF:", err.message);
@@ -608,6 +634,83 @@ async function getPageTimings(req, res) {
     }
 }
 
+/**
+ * Delete a document and its related assets
+ * DELETE /api/documents/:docId
+ */
+async function deleteDocument(req, res) {
+    try {
+        const { docId } = req.params;
+        const deleted = await fileUtils.deleteDocumentAssets(docId);
+
+        if (!deleted) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        res.json({
+            message: 'Document deleted successfully',
+            docId
+        });
+    } catch (error) {
+        console.error("[Document Delete Error]:", error);
+        res.status(500).json({
+            error: 'Failed to delete document.',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Generate lip sync JSON using Rhubarb
+ * POST /api/documents/:docId/lipsync
+ */
+async function generateLipSync(req, res) {
+    try {
+        const { docId } = req.params;
+        const force = req.query?.force === 'true';
+
+        const metadata = await fileUtils.getDocumentMetadata(docId);
+        if (!metadata) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        const audioPath = await ensureDocumentAudio(docId);
+        const lipSyncExists = await fileUtils.lipSyncFileExists(docId);
+
+        if (lipSyncExists && !force) {
+            const existingData = await fileUtils.readLipSyncFile(docId);
+            return res.json({
+                message: 'Lip sync already exists. Use ?force=true to regenerate.',
+                docId,
+                lipSyncFile: `/audios/${docId}.json`,
+                mouthCues: existingData?.mouthCues?.length || 0,
+                metadata: existingData?.metadata || null,
+                cached: true
+            });
+        }
+
+        const lipSyncPath = fileUtils.getLipSyncFilePath(docId);
+        await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+
+        const lipSyncData = await fileUtils.readLipSyncFile(docId);
+
+        res.json({
+            message: 'Lip sync generated successfully.',
+            docId,
+            lipSyncFile: `/audios/${docId}.json`,
+            mouthCues: lipSyncData?.mouthCues?.length || 0,
+            metadata: lipSyncData?.metadata || null,
+            cached: false
+        });
+    } catch (error) {
+        console.error("[Lip Sync Error]:", error);
+        res.status(500).json({
+            error: 'Failed to generate lip sync.',
+            details: error.message
+        });
+    }
+}
+
 module.exports = {
     createDocument,
     getAllDocuments,
@@ -615,5 +718,7 @@ module.exports = {
     summarizeDocument,
     generateSummaryAudio,
     getPageTimings,
+    generateLipSync,
+    deleteDocument,
 };
 

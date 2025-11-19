@@ -9,6 +9,12 @@ router.get('/', documentController.getAllDocuments);
 // POST /api/documents - Extract text from uploaded PDF and save document
 router.post('/', validation.validateFileUpload, documentController.createDocument);
 
+// DELETE /api/documents/:docId - Delete a document and its assets
+router.delete('/:docId', validation.validateDocId, documentController.deleteDocument);
+
+// POST /api/documents/:docId/lipsync - Generate lip sync JSON via Rhubarb
+router.post('/:docId/lipsync', validation.validateDocId, documentController.generateLipSync);
+
 // GET /api/documents/:docId/file - Get PDF file by document ID
 router.get('/:docId/file', validation.validateDocId, documentController.getDocumentFile);
 
