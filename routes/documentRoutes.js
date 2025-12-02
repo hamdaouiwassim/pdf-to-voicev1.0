@@ -18,6 +18,9 @@ router.post('/:docId/lipsync', validation.validateDocId, documentController.gene
 // GET /api/documents/:docId/file - Get PDF file by document ID
 router.get('/:docId/file', validation.validateDocId, documentController.getDocumentFile);
 
+// GET /api/documents/:docId/statements - Get exercise statements
+router.get('/:docId/statements', validation.validateDocId, documentController.getDocumentStatements);
+
 // GET /api/documents/:docId/summary/audio - Generate audio from document summary (must come before /:docId/summary)
 router.get('/:docId/summary/audio', validation.validateDocId, validation.validateLanguage, documentController.generateSummaryAudio);
 

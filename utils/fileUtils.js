@@ -111,7 +111,9 @@ async function getAllDocuments() {
                             filename: data.filename, // Visual PDF filename (for backward compatibility)
                             timestamp: data.timestamp,
                             courseName: data.courseName || data.title,
-                            courseDescription: data.courseDescription || ''
+                            courseDescription: data.courseDescription || '',
+                            hasStatements: Array.isArray(data.statements) && data.statements.length > 0,
+                            statementsCount: Array.isArray(data.statements) ? data.statements.length : 0
                         };
                         
                         // Add dual PDF mode information if available
@@ -121,6 +123,8 @@ async function getAllDocuments() {
                             docInfo.visualFilename = data.visualFilename; // {docId}_visual.pdf
                             docInfo.numPagesText = data.numPagesText;
                             docInfo.numPagesVisual = data.numPagesVisual;
+                            docInfo.numPagesStatements = data.numPagesStatements || 0;
+                            docInfo.statementsFilename = data.statementsFilename || null;
                         } else {
                             docInfo.isDualMode = false;
                             // Legacy format: single PDF

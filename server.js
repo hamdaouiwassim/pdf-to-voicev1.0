@@ -13,16 +13,47 @@ const documentRoutes = require('./routes/documentRoutes');
 const ttsRoutes = require('./routes/ttsRoutes');
 const qaRoutes = require('./routes/qaRoutes');
 const audioRoutes = require('./routes/audioRoutes');
+const labRoutes = require('./routes/labRoutes');
 
 // Initialize Express app
 const app = express();
 
 // --- Middleware ---
-app.use(cors());
+// Configure CORS with explicit options
+// The cors() middleware automatically handles OPTIONS preflight requests
+app.use(cors({
+    origin: '*', // Allow all origins (can be restricted in production)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false
+}));
+
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/uploads', express.static(config.UPLOADS_DIR));
-app.use('/audios', express.static(config.AUDIOS_DIR));
+
+// Middleware to set inline Content-Disposition for PDF files (prevents download prompt on Android)
+const setInlineHeaders = (req, res, next) => {
+    // Check if the request is for a PDF file
+    if (req.path.toLowerCase().endsWith('.pdf')) {
+        // Set Content-Disposition to inline to force browser to display, not download
+        res.setHeader('Content-Disposition', 'inline; filename="' + req.path.split('/').pop() + '"');
+        res.setHeader('Content-Type', 'application/pdf');
+    }
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+};
+
+// Add CORS headers and inline disposition to static file serving
+app.use('/uploads', setInlineHeaders, express.static(config.UPLOADS_DIR));
+app.use('/audios', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+}, express.static(config.AUDIOS_DIR));
 app.use(fileUpload());
 
 // --- API Routes ---
@@ -31,6 +62,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/tts', ttsRoutes);
 app.use('/api/qa', qaRoutes);
 app.use('/api/audio', audioRoutes);
+app.use('/api/lab', labRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

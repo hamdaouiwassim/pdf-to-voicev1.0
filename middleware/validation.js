@@ -232,6 +232,36 @@ function validateUseFreeAI(req, res, next) {
     next();
 }
 
+/**
+ * Validate Lab/Python execution request payload
+ */
+function validatePythonLabRequest(req, res, next) {
+    const { code, instructions, stdin } = req.body || {};
+
+    if (!code || typeof code !== 'string' || code.trim().length === 0) {
+        return res.status(400).json({ error: 'Le code Python est requis.' });
+    }
+
+    const trimmed = code.trim();
+    if (trimmed.length < 3) {
+        return res.status(400).json({ error: 'Le code doit contenir au moins 3 caractères.' });
+    }
+
+    if (trimmed.length > config.PYTHON_MAX_CODE_LENGTH) {
+        return res.status(400).json({ error: `Le code dépasse la limite de ${config.PYTHON_MAX_CODE_LENGTH} caractères.` });
+    }
+
+    if (instructions && typeof instructions !== 'string') {
+        return res.status(400).json({ error: 'Les instructions doivent être une chaîne de caractères.' });
+    }
+
+    if (stdin && typeof stdin !== 'string') {
+        return res.status(400).json({ error: 'L’entrée standard doit être une chaîne de caractères.' });
+    }
+
+    next();
+}
+
 module.exports = {
     validateFileUpload,
     validateDocumentRequest,
@@ -241,5 +271,6 @@ module.exports = {
     validateAudioId,
     validateLanguage,
     validateUseFreeAI,
+    validatePythonLabRequest,
 };
 

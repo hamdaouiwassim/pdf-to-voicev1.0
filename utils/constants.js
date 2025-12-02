@@ -10,7 +10,8 @@ module.exports = {
     
     AUDIO_PREFIXES: {
         SUMMARY: '-summary',
-        QA: 'qa-'
+        QA: 'qa-',
+        LAB: 'lab-'
     },
     
     ERROR_MESSAGES: {

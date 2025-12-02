@@ -32,6 +32,14 @@ const config = {
     TTS_VOICE_DOCUMENT: 'Kore',
     TTS_VOICE_QA: 'Zephyr',
 
+    // Lab Space / Python Execution defaults
+    PYTHON_BINARIES: (process.env.PYTHON_BINARIES || 'python,py').split(',').map((value) => value.trim()).filter(Boolean),
+    PYTHON_TIMEOUT_MS: parseInt(process.env.PYTHON_TIMEOUT_MS || '8000', 10),
+    PYTHON_MAX_CODE_LENGTH: parseInt(process.env.PYTHON_MAX_CODE_LENGTH || '4000', 10),
+    PYTHON_MAX_STDIO_LENGTH: parseInt(process.env.PYTHON_MAX_STDIO_LENGTH || '20000', 10),
+    LAB_TTS_LANGUAGE: process.env.LAB_TTS_LANGUAGE || 'fr-FR',
+    LAB_FEEDBACK_LANGUAGE: process.env.LAB_FEEDBACK_LANGUAGE || 'fr',
+
     // Lip Sync / Rhubarb configuration
     RHUBARB_PATH: (() => {
         // Check environment variable first

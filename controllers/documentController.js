@@ -20,6 +20,86 @@ try {
     pdfjsLib = null;
 }
 
+function buildStatementsFromText(docId, rawText) {
+    if (!rawText || typeof rawText !== 'string') {
+        return [];
+    }
+
+    return rawText
+        .split('\f')
+        .map((pageText, index) => {
+            const cleaned = pageText.replace(/\r/g, '').trim();
+            if (!cleaned) {
+                return null;
+            }
+
+            const lines = cleaned
+                .split('\n')
+                .map(line => line.trim())
+                .filter(Boolean);
+
+            if (lines.length === 0) {
+                return null;
+            }
+
+            const title = lines[0].slice(0, 160) || `Exercice ${index + 1}`;
+
+            return {
+                id: `${docId}-statement-${index + 1}`,
+                order: index + 1,
+                page: index + 1,
+                title,
+                body: cleaned
+            };
+        })
+        .filter(Boolean);
+}
+
+async function extractStatementsByPage(docId, pdfBuffer) {
+    if (!pdfBuffer) {
+        return [];
+    }
+
+    if (!pdfjsLib) {
+        console.warn('[Statements] pdfjs-dist not available, falling back to text-based extraction.');
+        return [];
+    }
+
+    try {
+        const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+        const pdfDocument = await loadingTask.promise;
+        const statements = [];
+
+        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+            const page = await pdfDocument.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const lines = textContent.items
+                .map(item => (item.str || '').trim())
+                .filter(Boolean);
+
+            const body = lines.join('\n').trim();
+            if (!body) {
+                continue;
+            }
+
+            const title = lines[0].slice(0, 160) || `Page ${pageNum}`;
+
+            statements.push({
+                id: `${docId}-statement-${pageNum}`,
+                order: pageNum,
+                page: pageNum,
+                title,
+                body
+            });
+        }
+
+        return statements;
+    } catch (error) {
+        console.warn('[Statements] Failed to extract statements by page:', error.message);
+        return [];
+    }
+}
+
 async function ensureDocumentAudio(docId) {
     const audioPath = fileUtils.getAudioFilePath(docId);
     if (await fileUtils.audioFileExists(docId)) {
@@ -50,6 +130,7 @@ async function createDocument(req, res) {
         const visualPdfBuffer = req.files.visualPdfFile.data;
         const courseName = typeof req.body?.courseName === 'string' ? req.body.courseName.trim() : '';
         const courseDescription = typeof req.body?.courseDescription === 'string' ? req.body.courseDescription.trim() : '';
+        const statementsPdfFile = req.files?.statementsPdfFile;
 
         // Generate unique ID for the document
         const docId = crypto.randomUUID();
@@ -57,17 +138,79 @@ async function createDocument(req, res) {
         // Text PDF for TTS, Visual PDF for display
         const textPdfFilename = `${docId}_text${constants.FILE_EXTENSIONS.PDF}`;
         const visualPdfFilename = `${docId}_visual${constants.FILE_EXTENSIONS.PDF}`;
+        const statementsPdfFilename = statementsPdfFile ? `${docId}_statements${constants.FILE_EXTENSIONS.PDF}` : null;
         
         const textPdfPath = path.join(config.UPLOADS_DIR, textPdfFilename);
         const visualPdfPath = path.join(config.UPLOADS_DIR, visualPdfFilename);
+        const statementsPdfPath = statementsPdfFilename ? path.join(config.UPLOADS_DIR, statementsPdfFilename) : null;
 
-        // Parse both PDFs and save files in parallel
-        const [textResult, visualResult] = await Promise.all([
-            pdfParse(textPdfBuffer),
-            pdfParse(visualPdfBuffer),
+        // Parse PDFs and save files
+        const textParsePromise = pdfParse(textPdfBuffer);
+        const visualParsePromise = pdfParse(visualPdfBuffer);
+        const writePromises = [
             fsPromises.writeFile(textPdfPath, textPdfBuffer),
             fsPromises.writeFile(visualPdfPath, visualPdfBuffer)
-        ]);
+        ];
+
+        let statementsParsePromise = null;
+        if (statementsPdfFile) {
+            statementsParsePromise = pdfParse(statementsPdfFile.data);
+            writePromises.push(fsPromises.writeFile(statementsPdfPath, statementsPdfFile.data));
+        }
+
+        const parsePromises = [textParsePromise, visualParsePromise];
+        if (statementsParsePromise) {
+            parsePromises.push(statementsParsePromise);
+        }
+
+        const parseResults = await Promise.all(parsePromises);
+        await Promise.all(writePromises);
+
+        const textResult = parseResults[0];
+        const visualResult = parseResults[1];
+        const statementsResult = statementsParsePromise ? parseResults[2] : null;
+        let statements = [];
+
+        if (statementsPdfFile) {
+            statements = await extractStatementsByPage(docId, statementsPdfFile.data);
+
+            if (statements.length < (statementsParsePromise ? statementsResult?.numpages || 0 : 0)) {
+                const pdfBuffer = statementsPdfFile.data;
+                if (pdfjsLib) {
+                    try {
+                        const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+                        const pdfDocument = await loadingTask.promise;
+                        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+                            if (statements.find(st => st.page === pageNum)) continue;
+
+                            const page = await pdfDocument.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            const lines = textContent.items
+                                .map(item => (item.str || '').trim())
+                                .filter(Boolean);
+
+                            const title = lines[0]?.slice(0, 160) || `Page ${pageNum}`;
+                            const body = lines.join('\n').trim();
+
+                            statements.push({
+                                id: `${docId}-statement-${pageNum}`,
+                                order: pageNum,
+                                page: pageNum,
+                                title,
+                                body: body || '(Page vide)'
+                            });
+                        }
+                        statements.sort((a, b) => a.page - b.page);
+                    } catch (innerError) {
+                        console.warn('[Statements] Unable to backfill pages:', innerError.message);
+                    }
+                }
+            }
+        }
+
+        if ((!statements || statements.length === 0) && statementsResult?.text) {
+            statements = buildStatementsFromText(docId, statementsResult.text);
+        }
 
         const derivedTitle = req.files.visualPdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, '');
         const title = courseName || derivedTitle;
@@ -83,6 +226,10 @@ async function createDocument(req, res) {
             length: textResult.text.length,
             numPagesText: textResult.numpages || 1, // Number of pages in text PDF
             numPagesVisual: visualResult.numpages || 1, // Number of pages in visual PDF
+            statementsFilename: statementsPdfFilename,
+            statements,
+            numPagesStatements: statementsResult?.numpages || 0,
+            statementsCount: statements?.length || 0,
             isDualMode: true, // Always true now
             timestamp: new Date().toISOString(),
             courseName: title,
@@ -97,9 +244,12 @@ async function createDocument(req, res) {
             filename: visualPdfFilename, // Visual PDF for display
             textFilename: textPdfFilename,
             visualFilename: visualPdfFilename,
+            statementsFilename: statementsPdfFilename,
             isDualMode: true,
             numPagesText: sidecarData.numPagesText,
             numPagesVisual: sidecarData.numPagesVisual,
+            numPagesStatements: sidecarData.numPagesStatements,
+            statementsCount: sidecarData.statementsCount,
             title: sidecarData.title,
             courseName: sidecarData.courseName,
             courseDescription: sidecarData.courseDescription
@@ -172,9 +322,13 @@ async function getDocumentFile(req, res) {
             return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
         }
 
-        // Set appropriate headers and send file
+        // Set appropriate headers with CORS support and send file
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        // Explicitly set CORS headers for file downloads
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         res.sendFile(path.resolve(pdfFilePath));
     } catch (error) {
         console.error("[Document File Error]:", error);
@@ -711,6 +865,35 @@ async function generateLipSync(req, res) {
     }
 }
 
+/**
+ * Get exercise statements for a document
+ * GET /api/documents/:docId/statements
+ */
+async function getDocumentStatements(req, res) {
+    try {
+        const { docId } = req.params;
+        const metadata = await fileUtils.getDocumentMetadata(docId);
+
+        if (!metadata) {
+            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        }
+
+        const statements = Array.isArray(metadata.statements) ? metadata.statements : [];
+
+        res.json({
+            docId,
+            hasStatements: statements.length > 0,
+            statements
+        });
+    } catch (error) {
+        console.error("[Document Statements Error]:", error);
+        res.status(500).json({
+            error: 'Failed to load statements.',
+            details: error.message
+        });
+    }
+}
+
 module.exports = {
     createDocument,
     getAllDocuments,
@@ -720,5 +903,6 @@ module.exports = {
     getPageTimings,
     generateLipSync,
     deleteDocument,
+    getDocumentStatements,
 };
 

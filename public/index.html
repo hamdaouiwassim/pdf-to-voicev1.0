@@ -43,10 +43,14 @@
                 Upload Course Documents
             </h2>
 
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <p class="text-sm text-blue-800">
-                    <i class="fas fa-info-circle mr-2"></i>
-                    <strong>Required:</strong> Upload two PDFs - one with text content (for TTS) and one for presentation (for display). The TTS will be synchronized with the presentation PDF pages.
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 space-y-2">
+                <p class="text-sm text-blue-800 flex items-center gap-2">
+                    <i class="fas fa-info-circle"></i>
+                    <span><strong>Required:</strong> Upload two PDFs — one with text content (for TTS) and one for presentation (for display). The TTS will stay synchronized with the presentation PDF pages.</span>
+                </p>
+                <p class="text-sm text-blue-800 flex items-center gap-2">
+                    <i class="fas fa-lightbulb text-yellow-500"></i>
+                    <span><strong>New (optional):</strong> You can add a third PDF containing the exercise statements that will feed the interactive lab.</span>
                 </p>
             </div>
             
@@ -99,6 +103,16 @@
                         <p class="text-sm text-gray-500">PDF to be shown to users during the course</p>
                     </label>
                     <div id="visualFileName" class="mt-2 text-purple-600 font-medium text-sm hidden"></div>
+                </div>
+
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+                    <input type="file" id="inpStatementsFile" accept=".pdf" class="hidden">
+                    <label for="inpStatementsFile" class="cursor-pointer">
+                        <i class="fas fa-tasks text-4xl text-pink-500 mb-2"></i>
+                        <p class="text-gray-700 font-medium mb-1">Exercise Statements PDF (optional)</p>
+                        <p class="text-sm text-gray-500">Each page can hold an exercise statement for the coding lab.</p>
+                    </label>
+                    <div id="statementsFileName" class="mt-2 text-pink-500 font-medium text-sm hidden"></div>
                 </div>
             </div>
 
@@ -212,10 +226,12 @@
     <script>
         const inpTextFile = document.getElementById("inpTextFile");
         const inpVisualFile = document.getElementById("inpVisualFile");
+        const inpStatementsFile = document.getElementById("inpStatementsFile");
         const btnUpload = document.getElementById("btnUpload");
         const result = document.getElementById("result");
         const textFileName = document.getElementById("textFileName");
         const visualFileName = document.getElementById("visualFileName");
+        const statementsFileName = document.getElementById("statementsFileName");
         const uploadLoading = document.getElementById("uploadLoading");
         const uploadResult = document.getElementById("uploadResult");
         const uploadError = document.getElementById("uploadError");
@@ -286,6 +302,17 @@
             }
         });
 
+        // Statements PDF file input change handler
+        inpStatementsFile.addEventListener("change", (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                statementsFileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                statementsFileName.classList.remove("hidden");
+            } else {
+                statementsFileName.classList.add("hidden");
+            }
+        });
+
         // Check if upload button should be enabled (both files required)
         function checkUploadReady() {
             const hasFiles = inpTextFile.files.length > 0 && inpVisualFile.files.length > 0;
@@ -326,6 +353,9 @@
             const formData = new FormData();
             formData.append("textPdfFile", inpTextFile.files[0]);
             formData.append("visualPdfFile", inpVisualFile.files[0]);
+            if (inpStatementsFile.files[0]) {
+                formData.append("statementsPdfFile", inpStatementsFile.files[0]);
+            }
             formData.append("courseName", courseName);
             formData.append("courseDescription", courseDescription);
 
@@ -349,8 +379,10 @@
                     <strong>Document ID:</strong> ${data.docId}<br>
                     <strong>Text PDF:</strong> ${data.textFilename || 'N/A'}<br>
                     <strong>Presentation PDF:</strong> ${data.visualFilename || 'N/A'}<br>
+                    <strong>Statements PDF:</strong> ${data.statementsFilename || 'Not provided'}<br>
                     <strong>Text Pages:</strong> ${data.numPagesText || 0}<br>
                     <strong>Presentation Pages:</strong> ${data.numPagesVisual || 0}<br>
+                    <strong>Statement Pages:</strong> ${data.numPagesStatements || 0}<br>
                     <strong>Characters extracted:</strong> ${data.text?.length || 0}
                 `;
                 
@@ -363,10 +395,12 @@
                 // Clear file inputs
                 inpTextFile.value = "";
                 inpVisualFile.value = "";
+                inpStatementsFile.value = "";
                 inpCourseName.value = "";
                 inpCourseDescription.value = "";
                 textFileName.classList.add("hidden");
                 visualFileName.classList.add("hidden");
+                statementsFileName.classList.add("hidden");
                 btnUpload.disabled = true;
 
                 // Refresh documents list
