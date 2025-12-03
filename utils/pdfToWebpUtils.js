@@ -1,15 +1,24 @@
 const sharp = require('sharp');
 const fsPromises = require('fs').promises;
 const path = require('path');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+
+const execAsync = promisify(exec);
 
 // Lazy load pdf-poppler to avoid initialization errors on unsupported platforms
 let Poppler = null;
+let useCommandLine = false;
+
 function getPoppler() {
-    if (!Poppler) {
+    if (!Poppler && !useCommandLine) {
         try {
             Poppler = require('pdf-poppler');
         } catch (error) {
-            throw new Error(`pdf-poppler is not available: ${error.message}`);
+            // If pdf-poppler fails, fall back to command-line Poppler tools
+            console.warn('[PDF to WebP] pdf-poppler package not available, using command-line Poppler tools');
+            useCommandLine = true;
+            Poppler = null;
         }
     }
     return Poppler;
@@ -30,48 +39,108 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
         // Get base filename without extension
         const baseName = path.basename(pdfPath, path.extname(pdfPath));
 
-        // Count pages using Poppler.info
-        console.log(`[PDF to WebP] Reading PDF info...`);
-        const PopplerLib = getPoppler();
-        const pdfInfo = await PopplerLib.info(pdfPath);
-        const pageCount = pdfInfo.pages;
+        // Check if we should use command-line tools
+        getPoppler();
+        
+        let pageCount;
+        if (useCommandLine) {
+            // Use pdfinfo command-line tool
+            console.log(`[PDF to WebP] Reading PDF info using pdfinfo...`);
+            try {
+                const { stdout } = await execAsync(`pdfinfo "${pdfPath}"`);
+                const pageMatch = stdout.match(/Pages:\s*(\d+)/i);
+                pageCount = pageMatch ? parseInt(pageMatch[1], 10) : 0;
+            } catch (error) {
+                // Fallback: try to count pages by attempting conversion
+                console.warn('[PDF to WebP] pdfinfo failed, will determine page count during conversion');
+                pageCount = null; // Will be determined during conversion
+            }
+        } else {
+            // Use pdf-poppler package
+            console.log(`[PDF to WebP] Reading PDF info...`);
+            const PopplerLib = getPoppler();
+            const pdfInfo = await PopplerLib.info(pdfPath);
+            pageCount = pdfInfo.pages;
+        }
 
-        if (!pageCount || pageCount === 0) {
+        if (pageCount !== null && (!pageCount || pageCount === 0)) {
             throw new Error('No pages found in PDF');
         }
 
-        console.log(`[PDF to WebP] Converting ${pageCount} pages to WebP (scale: ${scale}px width)...`);
+        console.log(`[PDF to WebP] Converting ${pageCount || '?'} pages to WebP (scale: ${scale}px width)...`);
 
-        // Convert one page at a time to JPG (pdf-poppler may not support WebP directly)
-        // Then convert JPG to WebP using sharp
+        // Convert one page at a time to JPG, then to WebP using sharp
         const imageFiles = [];
-        for (let i = 1; i <= pageCount; i++) {
-            const options = {
-                format: 'jpg', // Convert to JPG first (more reliable than WebP)
-                out_dir: outputDir,
-                out_prefix: `${baseName}_page`,
-                page: i,
-                scale: scale // Higher resolution (width in pixels, maintains aspect ratio)
-            };
-
-            console.log(`[PDF to WebP] Converting page ${i}/${pageCount} to JPG...`);
-            const PopplerLib = getPoppler();
-            await PopplerLib.convert(pdfPath, options);
-
-            // Wait a bit for file system to sync
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // List all files in output directory to see what was created
-            const allFiles = await fsPromises.readdir(outputDir);
-            const imageFilesInDir = allFiles.filter(f => 
-                f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.png') || f.endsWith('.webp')
-            );
+        const maxPages = pageCount || 1000; // Safety limit if pageCount is unknown
+        
+        for (let i = 1; i <= maxPages; i++) {
+            let jpgPath = null;
             
-            console.log(`[PDF to WebP] Image files in output directory after page ${i}:`, imageFilesInDir);
+            if (useCommandLine) {
+                // Use pdftoppm command-line tool
+                console.log(`[PDF to WebP] Converting page ${i} to JPG using pdftoppm...`);
+                const outputPrefix = path.join(outputDir, `${baseName}_page-${i.toString().padStart(2, '0')}`);
+                
+                try {
+                    // pdftoppm -jpeg -r 2000 -f 1 -l 1 input.pdf output
+                    // -r is resolution in DPI, we approximate scale/10 as DPI
+                    const dpi = Math.round(scale / 10);
+                    await execAsync(`pdftoppm -jpeg -r ${dpi} -f ${i} -l ${i} "${pdfPath}" "${outputPrefix}"`);
+                    
+                    // Find the created file
+                    const files = await fsPromises.readdir(outputDir);
+                    const createdFile = files.find(f => 
+                        f.startsWith(`${baseName}_page-${i.toString().padStart(2, '0')}`) && 
+                        (f.endsWith('.jpg') || f.endsWith('.jpeg'))
+                    );
+                    
+                    if (createdFile) {
+                        jpgPath = path.join(outputDir, createdFile);
+                    } else {
+                        // If no file found and we don't know page count, we might have reached the end
+                        if (pageCount === null) {
+                            break;
+                        }
+                        throw new Error(`Page ${i} conversion failed - file not found`);
+                    }
+                } catch (error) {
+                    // If pageCount is unknown and we get an error, we've likely reached the end
+                    if (pageCount === null && i > 1) {
+                        break;
+                    }
+                    throw error;
+                }
+            } else {
+                // Use pdf-poppler package
+                const options = {
+                    format: 'jpg', // Convert to JPG first (more reliable than WebP)
+                    out_dir: outputDir,
+                    out_prefix: `${baseName}_page`,
+                    page: i,
+                    scale: scale // Higher resolution (width in pixels, maintains aspect ratio)
+                };
 
-            // Find the file that was created (JPG, PNG, or WebP)
-            // Try multiple patterns: {prefix}-{page}.jpg, {prefix}{page}.jpg, etc.
-            let createdFile = imageFilesInDir.find(f => {
+                console.log(`[PDF to WebP] Converting page ${i}/${pageCount} to JPG...`);
+                const PopplerLib = getPoppler();
+                await PopplerLib.convert(pdfPath, options);
+
+                // Wait a bit for file system to sync
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // Find the created JPG file if not already found (for pdf-poppler)
+            if (!jpgPath) {
+                // List all files in output directory to see what was created
+                const allFiles = await fsPromises.readdir(outputDir);
+                const imageFilesInDir = allFiles.filter(f => 
+                    f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.png') || f.endsWith('.webp')
+                );
+                
+                console.log(`[PDF to WebP] Image files in output directory after page ${i}:`, imageFilesInDir);
+
+                // Find the file that was created (JPG, PNG, or WebP)
+                // Try multiple patterns: {prefix}-{page}.jpg, {prefix}{page}.jpg, etc.
+                const createdFile = imageFilesInDir.find(f => {
                 const ext = path.extname(f).toLowerCase();
                 if (ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png' && ext !== '.webp') return false;
                 
@@ -324,9 +393,10 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
             return pageNumA - pageNumB;
         });
 
-        console.log(`[PDF to WebP] Successfully converted ${webpFiles.length} of ${pageCount} pages to WebP`);
+        const actualPageCount = pageCount || webpFiles.length;
+        console.log(`[PDF to WebP] Successfully converted ${webpFiles.length} of ${actualPageCount} pages to WebP`);
         
-        if (webpFiles.length < pageCount) {
+        if (pageCount !== null && webpFiles.length < pageCount) {
             console.warn(`[PDF to WebP] Warning: Only ${webpFiles.length} of ${pageCount} pages were converted`);
         }
         
