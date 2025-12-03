@@ -140,58 +140,62 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
 
                 // Find the file that was created (JPG, PNG, or WebP)
                 // Try multiple patterns: {prefix}-{page}.jpg, {prefix}{page}.jpg, etc.
-                const createdFile = imageFilesInDir.find(f => {
-                const ext = path.extname(f).toLowerCase();
-                if (ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png' && ext !== '.webp') return false;
-                
-                // Pattern 1: {baseName}_page-{i}.jpg or {baseName}_page-{padded}.jpg
-                if (f === `${baseName}_page-${i}.${ext.slice(1)}` || 
-                    f === `${baseName}_page-${i.toString().padStart(2, '0')}.${ext.slice(1)}`) {
-                    return true;
-                }
-                // Pattern 2: {baseName}_page{i}.jpg (no dash)
-                if (f === `${baseName}_page${i}.${ext.slice(1)}` || 
-                    f === `${baseName}_page${i.toString().padStart(2, '0')}.${ext.slice(1)}`) {
-                    return true;
-                }
-                // Pattern 3: page-{i}.jpg or page{i}.jpg (just the prefix)
-                if (f === `page-${i}.${ext.slice(1)}` || f === `page${i}.${ext.slice(1)}` || 
-                    f === `page-${i.toString().padStart(2, '0')}.${ext.slice(1)}` || 
-                    f === `page${i.toString().padStart(2, '0')}.${ext.slice(1)}`) {
-                    return true;
-                }
-                // Pattern 4: Extract page number from filename and match
-                const pageMatch = f.match(/(?:page|page-)(\d+)\.(jpg|jpeg|png|webp)$/i);
-                if (pageMatch && parseInt(pageMatch[1]) === i) {
-                    return true;
-                }
-                return false;
-            });
+                let createdFile = imageFilesInDir.find(f => {
+                    const ext = path.extname(f).toLowerCase();
+                    if (ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png' && ext !== '.webp') return false;
+                    
+                    // Pattern 1: {baseName}_page-{i}.jpg or {baseName}_page-{padded}.jpg
+                    if (f === `${baseName}_page-${i}.${ext.slice(1)}` || 
+                        f === `${baseName}_page-${i.toString().padStart(2, '0')}.${ext.slice(1)}`) {
+                        return true;
+                    }
+                    // Pattern 2: {baseName}_page{i}.jpg (no dash)
+                    if (f === `${baseName}_page${i}.${ext.slice(1)}` || 
+                        f === `${baseName}_page${i.toString().padStart(2, '0')}.${ext.slice(1)}`) {
+                        return true;
+                    }
+                    // Pattern 3: page-{i}.jpg or page{i}.jpg (just the prefix)
+                    if (f === `page-${i}.${ext.slice(1)}` || f === `page${i}.${ext.slice(1)}` || 
+                        f === `page-${i.toString().padStart(2, '0')}.${ext.slice(1)}` || 
+                        f === `page${i.toString().padStart(2, '0')}.${ext.slice(1)}`) {
+                        return true;
+                    }
+                    // Pattern 4: Extract page number from filename and match
+                    const pageMatch = f.match(/(?:page|page-)(\d+)\.(jpg|jpeg|png|webp)$/i);
+                    if (pageMatch && parseInt(pageMatch[1]) === i) {
+                        return true;
+                    }
+                    return false;
+                });
 
-            // If still not found, try to find any new image file that wasn't there before
-            if (!createdFile && i === 1) {
-                // For first page, any image file is likely ours
-                createdFile = imageFilesInDir.find(f => 
-                    (f.includes('page') || f.startsWith(baseName)) && 
-                    (f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.png') || f.endsWith('.webp'))
-                );
+                // If still not found, try to find any new image file that wasn't there before
+                if (!createdFile && i === 1) {
+                    // For first page, any image file is likely ours
+                    createdFile = imageFilesInDir.find(f => 
+                        (f.includes('page') || f.startsWith(baseName)) && 
+                        (f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.png') || f.endsWith('.webp'))
+                    );
+                }
+
+                if (createdFile) {
+                    jpgPath = path.join(outputDir, createdFile);
+                }
             }
 
-            if (createdFile) {
-                const createdFilePath = path.join(outputDir, createdFile);
-                const ext = path.extname(createdFile).toLowerCase();
+            if (jpgPath) {
+                const ext = path.extname(jpgPath).toLowerCase();
                 const webpFilename = `${baseName}_page-${i.toString().padStart(2, '0')}.webp`;
                 const webpPath = path.join(outputDir, webpFilename);
                 
                 // If it's already WebP, just rename if needed
                 if (ext === '.webp') {
-                    if (createdFile !== webpFilename) {
+                    if (path.basename(jpgPath) !== webpFilename) {
                         try {
-                            await fsPromises.rename(createdFilePath, webpPath);
-                            console.log(`[PDF to WebP] Renamed ${createdFile} to ${webpFilename}`);
+                            await fsPromises.rename(jpgPath, webpPath);
+                            console.log(`[PDF to WebP] Renamed ${path.basename(jpgPath)} to ${webpFilename}`);
                         } catch (renameError) {
-                            console.warn(`[PDF to WebP] Could not rename ${createdFile}, using original name`);
-                            imageFiles.push(createdFilePath);
+                            console.warn(`[PDF to WebP] Could not rename ${path.basename(jpgPath)}, using original name`);
+                            imageFiles.push(jpgPath);
                             continue;
                         }
                     }
@@ -199,8 +203,8 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
                 } else {
                     // Convert JPG/PNG to WebP using sharp
                     try {
-                        console.log(`[PDF to WebP] Converting ${createdFile} to WebP...`);
-                        await sharp(createdFilePath)
+                        console.log(`[PDF to WebP] Converting ${path.basename(jpgPath)} to WebP...`);
+                        await sharp(jpgPath)
                             .webp({ 
                                 quality: 90, // High quality WebP
                                 effort: 6 // Higher effort for better compression
@@ -208,17 +212,21 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
                             .toFile(webpPath);
                         
                         // Delete the original JPG/PNG file
-                        await fsPromises.unlink(createdFilePath);
+                        await fsPromises.unlink(jpgPath);
                         imageFiles.push(webpPath);
                         console.log(`[PDF to WebP] Page ${i} converted successfully: ${webpFilename}`);
                     } catch (convertError) {
-                        console.error(`[PDF to WebP] Failed to convert ${createdFile} to WebP:`, convertError.message);
+                        console.error(`[PDF to WebP] Failed to convert ${path.basename(jpgPath)} to WebP:`, convertError.message);
                         // If conversion fails, keep the original file
-                        imageFiles.push(createdFilePath);
+                        imageFiles.push(jpgPath);
                     }
                 }
             } else {
-                console.error(`[PDF to WebP] Page ${i} conversion failed - file not found. Available files:`, imageFilesInDir);
+                // If pageCount was unknown and we can't find a file, we've reached the end
+                if (pageCount === null) {
+                    break;
+                }
+                console.error(`[PDF to WebP] Page ${i} conversion failed - file not found`);
                 // Try to continue with other pages
             }
         }
