@@ -23,6 +23,15 @@ RUN npm ci --omit=dev
 # Copy application source
 COPY . .
 
+# Set execute permissions on Rhubarb executable (if it exists)
+# This fixes EACCES errors when trying to run the lip sync tool
+RUN if [ -f /app/libsync/rhubarb ]; then \
+        chmod +x /app/libsync/rhubarb && \
+        echo "✓ Set execute permissions on Rhubarb executable"; \
+    else \
+        echo "⚠ Rhubarb executable not found at /app/libsync/rhubarb"; \
+    fi
+
 # Configure runtime
 ENV NODE_ENV=production
 ENV PORT=3002
