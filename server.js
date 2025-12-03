@@ -91,6 +91,18 @@ app.listen(config.PORT, () => {
         console.log(`API Key: ${keyDisplay} (Set via .env file or GEMINI_API_KEY)`);
         console.log(`Uploads Directory: ${config.UPLOADS_DIR}`);
         console.log(`Audio Directory: ${config.AUDIOS_DIR}`);
+        console.log(`Platform: ${process.platform}`);
+        
+        // Check if Poppler utilities are available (for PDF to WebP conversion)
+        const { execSync } = require('child_process');
+        try {
+            execSync('pdftocairo -v', { stdio: 'ignore' });
+            console.log('✓ Poppler utilities are available');
+        } catch (error) {
+            console.warn('⚠ Poppler utilities not found - PDF to WebP conversion may fail');
+            console.warn('  Install with: apt-get install poppler-utils (Debian/Ubuntu)');
+        }
+        
         console.log("-----------------------------------------");
         console.log("NOTE: Open index.html in your browser.");
     } catch (error) {

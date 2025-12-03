@@ -1,7 +1,19 @@
-const Poppler = require('pdf-poppler');
 const sharp = require('sharp');
 const fsPromises = require('fs').promises;
 const path = require('path');
+
+// Lazy load pdf-poppler to avoid initialization errors on unsupported platforms
+let Poppler = null;
+function getPoppler() {
+    if (!Poppler) {
+        try {
+            Poppler = require('pdf-poppler');
+        } catch (error) {
+            throw new Error(`pdf-poppler is not available: ${error.message}`);
+        }
+    }
+    return Poppler;
+}
 
 /**
  * Convert PDF pages to WebP images using pdf-poppler
@@ -20,7 +32,8 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
 
         // Count pages using Poppler.info
         console.log(`[PDF to WebP] Reading PDF info...`);
-        const pdfInfo = await Poppler.info(pdfPath);
+        const PopplerLib = getPoppler();
+        const pdfInfo = await PopplerLib.info(pdfPath);
         const pageCount = pdfInfo.pages;
 
         if (!pageCount || pageCount === 0) {
@@ -42,7 +55,8 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
             };
 
             console.log(`[PDF to WebP] Converting page ${i}/${pageCount} to JPG...`);
-            await Poppler.convert(pdfPath, options);
+            const PopplerLib = getPoppler();
+            await PopplerLib.convert(pdfPath, options);
 
             // Wait a bit for file system to sync
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -340,7 +354,7 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
  */
 async function checkPopplerAvailable() {
     try {
-        require('pdf-poppler');
+        getPoppler();
         return true;
     } catch (error) {
         console.warn('[PDF to WebP] pdf-poppler package not available:', error.message);
