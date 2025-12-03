@@ -9,19 +9,37 @@ const execAsync = promisify(exec);
 // Lazy load pdf-poppler to avoid initialization errors on unsupported platforms
 let Poppler = null;
 let useCommandLine = false;
+let popplerChecked = false;
+
+// Check if we're on Linux - pdf-poppler has issues on Linux, so use command-line tools directly
+const isLinux = process.platform === 'linux';
 
 function getPoppler() {
-    if (!Poppler && !useCommandLine) {
-        try {
-            Poppler = require('pdf-poppler');
-        } catch (error) {
-            // If pdf-poppler fails, fall back to command-line Poppler tools
-            console.warn('[PDF to WebP] pdf-poppler package not available, using command-line Poppler tools');
-            useCommandLine = true;
-            Poppler = null;
-        }
+    if (popplerChecked) {
+        return useCommandLine ? null : Poppler;
     }
-    return Poppler;
+    
+    popplerChecked = true;
+    
+    // On Linux, skip pdf-poppler entirely and use command-line tools directly
+    // This prevents the "linux is NOT supported" error message
+    if (isLinux) {
+        console.log('[PDF to WebP] Linux detected, using command-line Poppler tools');
+        useCommandLine = true;
+        return null;
+    }
+    
+    // On other platforms, try to use pdf-poppler
+    try {
+        Poppler = require('pdf-poppler');
+        console.log('[PDF to WebP] Using pdf-poppler package');
+        return Poppler;
+    } catch (error) {
+        // If pdf-poppler fails, fall back to command-line Poppler tools
+        console.warn('[PDF to WebP] pdf-poppler package not available, using command-line Poppler tools:', error.message);
+        useCommandLine = true;
+        return null;
+    }
 }
 
 /**
@@ -40,7 +58,7 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
         const baseName = path.basename(pdfPath, path.extname(pdfPath));
 
         // Check if we should use command-line tools
-        getPoppler();
+        getPoppler(); // This will set useCommandLine = true on Linux
         
         let pageCount;
         if (useCommandLine) {
@@ -59,8 +77,16 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
             // Use pdf-poppler package
             console.log(`[PDF to WebP] Reading PDF info...`);
             const PopplerLib = getPoppler();
-            const pdfInfo = await PopplerLib.info(pdfPath);
-            pageCount = pdfInfo.pages;
+            if (!PopplerLib) {
+                // Fallback to command line if pdf-poppler is not available
+                useCommandLine = true;
+                const { stdout } = await execAsync(`pdfinfo "${pdfPath}"`);
+                const pageMatch = stdout.match(/Pages:\s*(\d+)/i);
+                pageCount = pageMatch ? parseInt(pageMatch[1], 10) : 0;
+            } else {
+                const pdfInfo = await PopplerLib.info(pdfPath);
+                pageCount = pdfInfo.pages;
+            }
         }
 
         if (pageCount !== null && (!pageCount || pageCount === 0)) {
@@ -76,7 +102,7 @@ async function convertPdfToWebp(pdfPath, outputDir, scale = 2000) {
         for (let i = 1; i <= maxPages; i++) {
             let jpgPath = null;
             
-            if (useCommandLine) {
+            if (useCommandLine || !Poppler) {
                 // Use pdftoppm command-line tool
                 console.log(`[PDF to WebP] Converting page ${i} to JPG using pdftoppm...`);
                 const outputPrefix = path.join(outputDir, `${baseName}_page-${i.toString().padStart(2, '0')}`);
