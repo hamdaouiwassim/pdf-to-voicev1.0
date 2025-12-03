@@ -295,6 +295,278 @@ async function deleteDocumentAssets(docId) {
     return true;
 }
 
+/**
+ * Course Management Functions
+ */
+
+/**
+ * Get course metadata by courseId
+ * @param {string} courseId - Course ID
+ * @returns {Promise<Object | null>} Course metadata or null if not found
+ */
+async function getCourseMetadata(courseId) {
+    try {
+        const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
+        const jsonFilePath = path.join(coursesDir, `${courseId}.json`);
+        try {
+            await fsPromises.access(jsonFilePath);
+            const content = await fsPromises.readFile(jsonFilePath, 'utf8');
+            return JSON.parse(content);
+        } catch (accessError) {
+            if (accessError.code === 'ENOENT') {
+                return null;
+            }
+            throw accessError;
+        }
+    } catch (error) {
+        console.error(`[FS Error] Failed to read course metadata for ID ${courseId}:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * Save course metadata
+ * @param {Object} courseData - Course metadata object
+ * @returns {Promise<void>}
+ */
+async function saveCourseMetadata(courseData) {
+    const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
+    await fsPromises.mkdir(coursesDir, { recursive: true });
+    const jsonFilePath = path.join(coursesDir, `${courseData.id}.json`);
+    await fsPromises.writeFile(jsonFilePath, JSON.stringify(courseData, null, 2), 'utf8');
+}
+
+/**
+ * Get all courses
+ * @returns {Promise<Array>} Array of course metadata
+ */
+async function getAllCourses() {
+    try {
+        const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
+        await fsPromises.mkdir(coursesDir, { recursive: true });
+        const files = await fsPromises.readdir(coursesDir);
+        
+        const courses = await Promise.all(
+            files
+                .filter(f => f.endsWith('.json'))
+                .map(async (f) => {
+                    try {
+                        const jsonContent = await fsPromises.readFile(
+                            path.join(coursesDir, f),
+                            'utf8'
+                        );
+                        const data = JSON.parse(jsonContent);
+                        return {
+                            id: data.id,
+                            courseName: data.courseName,
+                            courseDescription: data.courseDescription,
+                            chaptersCount: Array.isArray(data.chapters) ? data.chapters.length : 0,
+                            createdAt: data.createdAt,
+                            updatedAt: data.updatedAt
+                        };
+                    } catch (error) {
+                        console.error(`[FS Error] Failed to read course ${f}:`, error.message);
+                        return null;
+                    }
+                })
+        );
+        
+        return courses.filter(course => course !== null);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return [];
+        }
+        throw error;
+    }
+}
+
+/**
+ * Delete a course and all its chapters
+ * @param {string} courseId - Course ID
+ * @returns {Promise<boolean>} True if course existed and was removed, false if not found
+ */
+async function deleteCourseAssets(courseId) {
+    const course = await getCourseMetadata(courseId);
+    if (!course) {
+        return false;
+    }
+
+    const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
+    const courseDir = path.join(coursesDir, courseId);
+    const courseJsonPath = path.join(coursesDir, `${courseId}.json`);
+
+    // Delete all chapters
+    if (Array.isArray(course.chapters)) {
+        for (const chapterRef of course.chapters) {
+            await deleteChapterAssets(courseId, chapterRef.id);
+        }
+    }
+
+    // Delete course directory and JSON file
+    try {
+        if (await fileExists(courseDir)) {
+            await fsPromises.rm(courseDir, { recursive: true, force: true });
+        }
+        if (await fileExists(courseJsonPath)) {
+            await fsPromises.unlink(courseJsonPath);
+        }
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            throw error;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Chapter Management Functions
+ */
+
+/**
+ * Get chapter metadata
+ * @param {string} courseId - Course ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<Object | null>} Chapter metadata or null if not found
+ */
+async function getChapterMetadata(courseId, chapterId) {
+    try {
+        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        const jsonFilePath = path.join(chapterDir, `${chapterId}.json`);
+        try {
+            await fsPromises.access(jsonFilePath);
+            const content = await fsPromises.readFile(jsonFilePath, 'utf8');
+            return JSON.parse(content);
+        } catch (accessError) {
+            if (accessError.code === 'ENOENT') {
+                return null;
+            }
+            throw accessError;
+        }
+    } catch (error) {
+        console.error(`[FS Error] Failed to read chapter metadata for ID ${chapterId}:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * Save chapter metadata
+ * @param {Object} chapterData - Chapter metadata object
+ * @returns {Promise<void>}
+ */
+async function saveChapterMetadata(chapterData) {
+    const chapterDir = path.join(config.UPLOADS_DIR, 'courses', chapterData.courseId, chapterData.id);
+    await fsPromises.mkdir(chapterDir, { recursive: true });
+    const jsonFilePath = path.join(chapterDir, `${chapterData.id}.json`);
+    await fsPromises.writeFile(jsonFilePath, JSON.stringify(chapterData, null, 2), 'utf8');
+}
+
+/**
+ * Get chapter text content
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<string | null>} Chapter text or null if not found
+ */
+async function getChapterText(chapterId) {
+    try {
+        // Find chapter by searching courses
+        const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
+        
+        // Check if courses directory exists
+        try {
+            await fsPromises.access(coursesDir);
+        } catch {
+            return null; // Courses directory doesn't exist
+        }
+        
+        const courses = await fsPromises.readdir(coursesDir);
+        
+        for (const courseFile of courses) {
+            if (!courseFile.endsWith('.json')) continue;
+            
+            try {
+                const coursePath = path.join(coursesDir, courseFile);
+                const courseContent = await fsPromises.readFile(coursePath, 'utf8');
+                const course = JSON.parse(courseContent);
+                
+                if (Array.isArray(course.chapters)) {
+                    const chapterRef = course.chapters.find(ch => ch.id === chapterId);
+                    if (chapterRef) {
+                        const chapter = await getChapterMetadata(course.id, chapterId);
+                        if (chapter && chapter.text) {
+                            return chapter.text;
+                        }
+                    }
+                }
+            } catch (error) {
+                // Skip invalid course files
+                console.warn(`[FS Error] Failed to read course ${courseFile}:`, error.message);
+                continue;
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error(`[FS Error] Failed to read chapter text for ID ${chapterId}:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * Delete a chapter and all its assets
+ * @param {string} courseId - Course ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<boolean>} True if chapter existed and was removed, false if not found
+ */
+async function deleteChapterAssets(courseId, chapterId) {
+    const chapter = await getChapterMetadata(courseId, chapterId);
+    if (!chapter) {
+        return false;
+    }
+
+    const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+    const chapterJsonPath = path.join(chapterDir, `${chapterId}.json`);
+
+    // Delete chapter directory (includes PDFs, WebP images, etc.)
+    try {
+        if (await fileExists(chapterDir)) {
+            await fsPromises.rm(chapterDir, { recursive: true, force: true });
+        }
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            throw error;
+        }
+    }
+
+    // Delete audio files
+    const audioFiles = [
+        path.join(config.AUDIOS_DIR, `${chapterId}${constants.FILE_EXTENSIONS.WAV}`),
+        path.join(config.AUDIOS_DIR, `${chapterId}${constants.AUDIO_PREFIXES.SUMMARY}${constants.FILE_EXTENSIONS.WAV}`),
+        getLipSyncFilePath(chapterId)
+    ];
+
+    const deleteFile = async (filePath) => {
+        try {
+            await fsPromises.unlink(filePath);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                throw error;
+            }
+        }
+    };
+
+    await Promise.all(audioFiles.map(deleteFile));
+
+    // Remove chapter from course
+    const course = await getCourseMetadata(courseId);
+    if (course && Array.isArray(course.chapters)) {
+        course.chapters = course.chapters.filter(ch => ch.id !== chapterId);
+        course.updatedAt = new Date().toISOString();
+        await saveCourseMetadata(course);
+    }
+
+    return true;
+}
+
 module.exports = {
     setupDirectories,
     getAITextByDocId,
@@ -310,5 +582,15 @@ module.exports = {
     lipSyncFileExists,
     readLipSyncFile,
     deleteDocumentAssets,
+    // Course functions
+    getCourseMetadata,
+    saveCourseMetadata,
+    getAllCourses,
+    deleteCourseAssets,
+    // Chapter functions
+    getChapterMetadata,
+    saveChapterMetadata,
+    getChapterText,
+    deleteChapterAssets,
 };
 

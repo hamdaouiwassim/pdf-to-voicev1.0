@@ -131,24 +131,25 @@ function validateQuestionRequest(req, res, next) {
 }
 
 /**
- * Validate document ID parameter
+ * Validate document ID parameter (supports docId, courseId, chapterId)
  */
 function validateDocId(req, res, next) {
-    const { docId } = req.params;
+    // Check for docId, courseId, or chapterId in params
+    const id = req.params.docId || req.params.courseId || req.params.chapterId;
 
-    if (!docId) {
+    if (!id) {
         return res.status(400).json({ error: constants.ERROR_MESSAGES.DOC_ID_REQUIRED });
     }
 
     // Security: Prevent directory traversal
-    if (docId.includes('..') || docId.includes('/') || docId.includes('\\')) {
+    if (id.includes('..') || id.includes('/') || id.includes('\\')) {
         return res.status(400).json({ error: constants.ERROR_MESSAGES.INVALID_DOC_ID });
     }
 
     // Validate UUID format (optional - can be more lenient for flexibility)
     // Only validate if it looks like a UUID
-    if (docId.includes('-') && !isValidUUID(docId)) {
-        return res.status(400).json({ error: 'Invalid document ID format' });
+    if (id.includes('-') && !isValidUUID(id)) {
+        return res.status(400).json({ error: 'Invalid ID format' });
     }
 
     next();
@@ -262,6 +263,83 @@ function validatePythonLabRequest(req, res, next) {
     next();
 }
 
+/**
+ * Validate chapter file upload middleware
+ * Requires both textPdfFile (for TTS) and visualPdfFile (for display)
+ * statementsPdfFile is optional
+ */
+function validateChapterUpload(req, res, next) {
+    if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).json({ error: constants.ERROR_MESSAGES.NO_FILE });
+    }
+
+    // Both PDFs are required
+    if (!req.files.textPdfFile) {
+        return res.status(400).json({ 
+            error: 'Text PDF file is required. Use field name "textPdfFile" for the PDF containing the full text content (for TTS).' 
+        });
+    }
+
+    if (!req.files.visualPdfFile) {
+        return res.status(400).json({ 
+            error: 'Visual PDF file is required. Use field name "visualPdfFile" for the PDF to be displayed to users.' 
+        });
+    }
+
+    const textFile = req.files.textPdfFile;
+    const visualFile = req.files.visualPdfFile;
+    const statementsFile = req.files?.statementsPdfFile;
+    const chapterName = typeof req.body?.chapterName === 'string' ? req.body.chapterName.trim() : '';
+
+    // Validate text PDF
+    if (!config.ALLOWED_MIME_TYPES.includes(textFile.mimetype)) {
+        return res.status(400).json({ error: 'Text PDF file must be application/pdf' });
+    }
+    if (textFile.size > config.MAX_FILE_SIZE) {
+        return res.status(400).json({ 
+            error: `Text PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
+        });
+    }
+    if (!textFile.name.toLowerCase().endsWith('.pdf')) {
+        return res.status(400).json({ error: 'Text PDF file must have .pdf extension' });
+    }
+
+    // Validate visual PDF
+    if (!config.ALLOWED_MIME_TYPES.includes(visualFile.mimetype)) {
+        return res.status(400).json({ error: 'Visual PDF file must be application/pdf' });
+    }
+    if (visualFile.size > config.MAX_FILE_SIZE) {
+        return res.status(400).json({ 
+            error: `Visual PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
+        });
+    }
+    if (!visualFile.name.toLowerCase().endsWith('.pdf')) {
+        return res.status(400).json({ error: 'Visual PDF file must have .pdf extension' });
+    }
+
+    // Validate statements PDF (optional)
+    if (statementsFile) {
+        if (!config.ALLOWED_MIME_TYPES.includes(statementsFile.mimetype)) {
+            return res.status(400).json({ error: 'Statements PDF file must be application/pdf' });
+        }
+        if (statementsFile.size > config.MAX_FILE_SIZE) {
+            return res.status(400).json({ 
+                error: `Statements PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
+            });
+        }
+        if (!statementsFile.name.toLowerCase().endsWith('.pdf')) {
+            return res.status(400).json({ error: 'Statements PDF file must have .pdf extension' });
+        }
+    }
+
+    // Validate chapter name (optional, will use filename if not provided)
+    if (chapterName && chapterName.length > 150) {
+        return res.status(400).json({ error: 'Chapter name must be less than 150 characters' });
+    }
+
+    next();
+}
+
 module.exports = {
     validateFileUpload,
     validateDocumentRequest,
@@ -272,5 +350,6 @@ module.exports = {
     validateLanguage,
     validateUseFreeAI,
     validatePythonLabRequest,
+    validateChapterUpload,
 };
 

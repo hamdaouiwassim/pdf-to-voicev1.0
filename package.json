@@ -18,8 +18,9 @@
     "express": "^5.1.0",
     "express-fileupload": "^1.5.2",
     "pdf-parse": "1.1.*",
+    "pdf-poppler": "^0.2.3",
     "pdfjs-dist": "^5.4.394",
-    "pdfkit": "^0.17.2"
+    "sharp": "^0.33.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",

@@ -11,10 +11,26 @@ async function generateTTS(req, res) {
     try {
         // Document ID validation is handled by middleware (validateDocIdInBody)
         const { docId } = req.body;
-        const text = await fileUtils.getAITextByDocId(docId);
+        
+        // Try to get text as a document first (backward compatibility)
+        let text = await fileUtils.getAITextByDocId(docId);
+        let source = 'document';
+        
+        // If not found as document, try as chapter
+        if (!text) {
+            console.log(`[TTS] Document text not found for ${docId}, trying as chapter...`);
+            text = await fileUtils.getChapterText(docId);
+            if (text) {
+                source = 'chapter';
+                console.log(`[TTS] Found chapter text for ${docId}, length: ${text.length} chars`);
+            }
+        } else {
+            console.log(`[TTS] Found document text for ${docId}, length: ${text.length} chars`);
+        }
 
         if (!text) {
-            return res.status(404).json({ error: 'Document content not found' });
+            console.error(`[TTS] No text found for ${docId} (tried both document and chapter)`);
+            return res.status(404).json({ error: 'Document or chapter content not found' });
         }
 
         // Check for cached audio (async)
@@ -33,7 +49,7 @@ async function generateTTS(req, res) {
         }
 
         // Generate new audio
-        console.log(`[TTS] Cache miss. Generating new voice for doc ID: ${docId}, length: ${text.length} chars`);
+        console.log(`[TTS] Cache miss. Generating new voice for ${source} ID: ${docId}, length: ${text.length} chars`);
         
         const { pcmBuffer } = await geminiService.generateTTS(text, config.TTS_VOICE_DOCUMENT);
         

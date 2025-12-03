@@ -14,6 +14,8 @@ const ttsRoutes = require('./routes/ttsRoutes');
 const qaRoutes = require('./routes/qaRoutes');
 const audioRoutes = require('./routes/audioRoutes');
 const labRoutes = require('./routes/labRoutes');
+const courseRoutes = require('./routes/courseRoutes');
+const chapterRoutes = require('./routes/chapterRoutes');
 
 // Initialize Express app
 const app = express();
@@ -63,6 +65,9 @@ app.use('/api/tts', ttsRoutes);
 app.use('/api/qa', qaRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/lab', labRoutes);
+// Course and Chapter routes
+app.use('/api/courses', courseRoutes);
+app.use('/api/courses/:courseId/chapters', chapterRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
