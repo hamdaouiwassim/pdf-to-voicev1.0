@@ -28,9 +28,28 @@ const app = express();
 
 // --- Middleware ---
 // Configure CORS with explicit options
-// The cors() middleware automatically handles OPTIONS preflight requests
+// When credentials are included, origin cannot be '*', must be specific origin(s)
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    : ['http://102.211.209.131:4080', 'http://localhost:4080', 'http://localhost:3000'];
+
 app.use(cors({
-    origin: '*', // Allow all origins (can be restricted in production)
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, Postman, curl)
+        if (!origin) return callback(null, true);
+        
+        // Check if origin is in allowed list
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            // In development, allow any origin (for testing)
+            if (process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'development') {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true // Enable credentials for session cookies
@@ -71,8 +90,12 @@ const setInlineHeaders = (req, res, next) => {
         res.setHeader('Content-Disposition', 'inline; filename="' + req.path.split('/').pop() + '"');
         res.setHeader('Content-Type', 'application/pdf');
     }
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Set CORS headers (use origin from request if in allowed list)
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     next();
@@ -81,7 +104,12 @@ const setInlineHeaders = (req, res, next) => {
 // Add CORS headers and inline disposition to static file serving
 app.use('/uploads', setInlineHeaders, express.static(config.UPLOADS_DIR));
 app.use('/audios', (req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Set CORS headers (use origin from request if in allowed list)
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     next();

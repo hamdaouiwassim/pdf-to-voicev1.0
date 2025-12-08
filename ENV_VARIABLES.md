@@ -106,6 +106,13 @@ GEMINI_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - **Description:** Port number for the Express server
 - **Example:** `PORT=3000`
 
+#### `ALLOWED_ORIGINS`
+- **Default:** `http://102.211.209.131:4080,http://localhost:4080,http://localhost:3000`
+- **Description:** Comma-separated list of allowed CORS origins. Required when using credentials (cookies/sessions).
+- **Note:** When `credentials: true` is used, you cannot use `*` as origin. Must specify exact origins.
+- **Example:** `ALLOWED_ORIGINS=http://102.211.209.131:4080,http://localhost:4080`
+- **Important:** Include your frontend URL(s) here to allow CORS requests with credentials
+
 ---
 
 ### Authentication Configuration
