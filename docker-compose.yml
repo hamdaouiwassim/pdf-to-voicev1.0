@@ -46,6 +46,7 @@ services:
       - ./uploads:/app/uploads
       - ./audios:/app/audios
       - ./temp:/app/temp
+      - ./.env:/app/.env
     depends_on:
       mysql:
         condition: service_healthy
