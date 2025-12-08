@@ -31,7 +31,7 @@ This guide explains how to run the document-reader API and MySQL database using 
    DB_NAME=titan_academy
    DB_USER=app_user
    DB_PASSWORD=app_password
-   DB_PORT=3306
+   DB_PORT=3307
    
    # API Configuration
    PORT=3000
@@ -64,7 +64,7 @@ This guide explains how to run the document-reader API and MySQL database using 
 ### MySQL Database
 
 - **Container name:** `document-reader-mysql`
-- **Port:** `3306` (configurable via `DB_PORT` in `.env`)
+- **Port:** `3307` (configurable via `DB_PORT` in `.env`, default changed from 3306 to avoid conflicts)
 - **Database:** `titan_academy` (configurable via `DB_NAME`)
 - **Root password:** Set via `DB_ROOT_PASSWORD` in `.env`
 - **Application user:** Set via `DB_USER` and `DB_PASSWORD` in `.env`
@@ -80,8 +80,9 @@ This guide explains how to run the document-reader API and MySQL database using 
 ### From your host machine:
 
 ```bash
-mysql -h 127.0.0.1 -P 3306 -u app_user -p titan_academy
+mysql -h 127.0.0.1 -P 3307 -u app_user -p titan_academy
 # Password: app_password (or your DB_PASSWORD value)
+# Note: Port is 3307 by default (changed from 3306 to avoid conflicts)
 ```
 
 ### From within the API container:
@@ -93,7 +94,7 @@ The API automatically connects to MySQL using the hostname `mysql` (the service 
 ### Using a MySQL client:
 
 - **Host:** `localhost` or `127.0.0.1`
-- **Port:** `3306` (or your `DB_PORT` value)
+- **Port:** `3307` (or your `DB_PORT` value, default changed from 3306)
 - **Username:** `app_user` (or your `DB_USER` value)
 - **Password:** `app_password` (or your `DB_PASSWORD` value)
 - **Database:** `titan_academy` (or your `DB_NAME` value)
@@ -183,18 +184,18 @@ docker-compose exec -T mysql mysql -u root -p titan_academy < backup.sql
 
 ### MySQL container won't start:
 
-1. Check if port 3306 is already in use:
+1. Check if port 3307 is already in use:
    ```bash
    # Windows
-   netstat -ano | findstr :3306
+   netstat -ano | findstr :3307
    
    # Linux/Mac
-   lsof -i :3306
+   lsof -i :3307
    ```
 
-2. Change the port in `.env`:
+2. Change the port in `.env` if needed:
    ```env
-   DB_PORT=3307
+   DB_PORT=3308
    ```
 
 3. Check MySQL logs:
@@ -252,7 +253,7 @@ Key variables for Docker:
 - `DB_NAME`: Database name
 - `DB_USER`: Application database user
 - `DB_PASSWORD`: Application database password
-- `DB_PORT`: External MySQL port (default: 3306)
+- `DB_PORT`: External MySQL port (default: 3307, changed from 3306 to avoid conflicts)
 - `PORT`: External API port (default: 3000)
 - `GEMINI_API_KEY`: Required for API functionality
 
@@ -260,7 +261,7 @@ Key variables for Docker:
 
 Both services run on a custom bridge network (`document-reader-network`), allowing them to communicate using service names as hostnames:
 - API connects to MySQL using hostname: `mysql`
-- MySQL is accessible from host using: `localhost:3306`
+- MySQL is accessible from host using: `localhost:3307` (default port changed from 3306)
 
 ## Stopping and Cleanup
 
