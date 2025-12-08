@@ -1,8 +1,5 @@
 const crypto = require('crypto');
-const fsPromises = require('fs').promises;
-const path = require('path');
-const config = require('../config/config');
-const fileUtils = require('../utils/fileUtils');
+const dbUtils = require('../utils/dbUtils');
 
 /**
  * Create a new course
@@ -24,25 +21,19 @@ async function createCourse(req, res) {
         // Generate unique ID for the course
         const courseId = crypto.randomUUID();
 
-        // Create course metadata
-        const courseData = {
+        // Create course in database
+        const course = await dbUtils.createCourse({
             id: courseId,
             courseName: courseName,
-            courseDescription: courseDescription || null,
-            chapters: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-
-        // Save course metadata
-        await fileUtils.saveCourseMetadata(courseData);
+            courseDescription: courseDescription || null
+        });
 
         res.json({
-            courseId: courseId,
-            courseName: courseData.courseName,
-            courseDescription: courseData.courseDescription,
+            courseId: course.id,
+            courseName: course.courseName,
+            courseDescription: course.courseDescription,
             chapters: [],
-            createdAt: courseData.createdAt
+            createdAt: course.createdAt
         });
     } catch (error) {
         console.error("[Course Create Error]:", error);
@@ -59,7 +50,7 @@ async function createCourse(req, res) {
  */
 async function getAllCourses(req, res) {
     try {
-        const courses = await fileUtils.getAllCourses();
+        const courses = await dbUtils.getAllCourses();
         res.json(courses);
     } catch (error) {
         console.error("[Courses List Error]:", error);
@@ -77,7 +68,7 @@ async function getAllCourses(req, res) {
 async function getCourse(req, res) {
     try {
         const { courseId } = req.params;
-        const course = await fileUtils.getCourseMetadata(courseId);
+        const course = await dbUtils.getCourseById(courseId);
 
         if (!course) {
             return res.status(404).json({ error: 'Course not found' });
@@ -103,25 +94,20 @@ async function updateCourse(req, res) {
         const courseName = typeof req.body?.courseName === 'string' ? req.body.courseName.trim() : '';
         const courseDescription = typeof req.body?.courseDescription === 'string' ? req.body.courseDescription.trim() : '';
 
-        const course = await fileUtils.getCourseMetadata(courseId);
-        if (!course) {
+        const existingCourse = await dbUtils.getCourseById(courseId);
+        if (!existingCourse) {
             return res.status(404).json({ error: 'Course not found' });
         }
 
-        if (courseName) {
-            if (courseName.length > 150) {
-                return res.status(400).json({ error: 'Course name must be less than 150 characters' });
-            }
-            course.courseName = courseName;
+        if (courseName && courseName.length > 150) {
+            return res.status(400).json({ error: 'Course name must be less than 150 characters' });
         }
 
-        if (courseDescription !== undefined) {
-            course.courseDescription = courseDescription || null;
-        }
+        const updates = {};
+        if (courseName) updates.courseName = courseName;
+        if (courseDescription !== undefined) updates.courseDescription = courseDescription;
 
-        course.updatedAt = new Date().toISOString();
-
-        await fileUtils.saveCourseMetadata(course);
+        const course = await dbUtils.updateCourse(courseId, updates);
 
         res.json({
             courseId: course.id,
@@ -146,11 +132,14 @@ async function updateCourse(req, res) {
 async function deleteCourse(req, res) {
     try {
         const { courseId } = req.params;
-        const deleted = await fileUtils.deleteCourseAssets(courseId);
+        const deleted = await dbUtils.deleteCourse(courseId);
 
         if (!deleted) {
             return res.status(404).json({ error: 'Course not found' });
         }
+
+        // Note: File deletion should be handled separately if needed
+        // The database cascade will delete chapters and images records
 
         res.json({
             message: 'Course deleted successfully',

@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "create-table": "node scripts/createUsersTable.js",
+    "create-db-tables": "node scripts/createDatabaseTables.js",
     "create-admin": "node scripts/createAdminUser.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

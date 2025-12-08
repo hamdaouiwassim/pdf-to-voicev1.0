@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const pdfParse = require('pdf-parse');
 const fsPromises = require('fs').promises;
 const fileUtils = require('../utils/fileUtils');
+const dbUtils = require('../utils/dbUtils');
 const audioUtils = require('../utils/audioUtils');
 const geminiService = require('../services/geminiService');
 const localTTSService = require('../services/localTTSService');
@@ -106,7 +107,19 @@ async function ensureChapterAudio(chapterId) {
         return audioPath;
     }
 
-    const text = await fileUtils.getChapterText(chapterId);
+    // Get chapter from database to get text content
+    // We need to find which course this chapter belongs to
+    const db = require('../config/database');
+    const chapters = await db.query(
+        'SELECT text_content, course_id FROM chapters WHERE id = ? LIMIT 1',
+        [chapterId]
+    );
+    
+    if (chapters.length === 0) {
+        throw new Error('Chapter not found in database.');
+    }
+    
+    const text = chapters[0].text_content;
     if (!text) {
         throw new Error('Chapter content not found for audio generation.');
     }
@@ -126,7 +139,7 @@ async function createChapter(req, res) {
         const { courseId } = req.params;
         
         // Validate course exists
-        const course = await fileUtils.getCourseMetadata(courseId);
+        const course = await dbUtils.getCourseById(courseId);
         if (!course) {
             return res.status(404).json({ error: 'Course not found' });
         }
@@ -269,56 +282,54 @@ async function createChapter(req, res) {
             title = `Chapter ${chapterId.substring(0, 8)}`;
         }
 
-        // Create chapter metadata
+        // Create chapter in database
         const chapterData = {
             id: chapterId,
             courseId: courseId,
             chapterName: title,
             chapterDescription: chapterDescription || null,
             videoLink: videoLink || null,
-            text: textResult?.text || null,
+            textContent: textResult?.text || null,
             textFilename: textPdfFilename,
             visualFilename: visualPdfFilename,
             statementsFilename: statementsPdfFilename,
-            length: textResult?.text?.length || 0,
+            textLength: textResult?.text?.length || 0,
             numPagesText: textResult?.numpages || 0,
             numPagesVisual: visualResult?.numpages || 0,
             numPagesStatements: statementsResult?.numpages || 0,
             statementsCount: statements?.length || 0,
-            statements: statements,
-            webpImages: webpImages.map(img => path.relative(config.UPLOADS_DIR, img)), // Store relative paths
-            timestamp: new Date().toISOString()
+            statements: statements
         };
 
-        // Save chapter metadata
-        await fileUtils.saveChapterMetadata(chapterData);
+        // Save chapter to database
+        const chapter = await dbUtils.createChapter(chapterData);
 
-        // Update course with new chapter
-        course.chapters.push({
-            id: chapterId,
-            chapterName: title,
-            chapterDescription: chapterDescription || null,
-            videoLink: videoLink || null,
-            createdAt: chapterData.timestamp
-        });
-        course.updatedAt = new Date().toISOString();
-        await fileUtils.saveCourseMetadata(course);
+        // Store WebP images in database
+        for (let i = 0; i < webpImages.length; i++) {
+            const imgPath = webpImages[i];
+            const relativePath = path.relative(config.UPLOADS_DIR, imgPath);
+            await dbUtils.addChapterImage(chapterId, {
+                imagePath: relativePath,
+                pageNumber: i + 1,
+                imageType: 'webp'
+            });
+        }
 
         res.json({
-            chapterId: chapterId,
-            courseId: courseId,
-            chapterName: chapterData.chapterName,
-            chapterDescription: chapterData.chapterDescription,
-            videoLink: chapterData.videoLink,
-            textFilename: chapterData.textFilename,
-            visualFilename: chapterData.visualFilename,
-            statementsFilename: chapterData.statementsFilename,
-            numPagesText: chapterData.numPagesText,
-            numPagesVisual: chapterData.numPagesVisual,
-            numPagesStatements: chapterData.numPagesStatements,
-            statementsCount: chapterData.statementsCount,
-            webpImages: chapterData.webpImages,
-            createdAt: chapterData.timestamp
+            chapterId: chapter.id,
+            courseId: chapter.courseId,
+            chapterName: chapter.chapterName,
+            chapterDescription: chapter.chapterDescription,
+            videoLink: chapter.videoLink,
+            textFilename: chapter.textFilename,
+            visualFilename: chapter.visualFilename,
+            statementsFilename: chapter.statementsFilename,
+            numPagesText: chapter.numPagesText,
+            numPagesVisual: chapter.numPagesVisual,
+            numPagesStatements: chapter.numPagesStatements,
+            statementsCount: chapter.statementsCount,
+            webpImages: chapter.webpImages,
+            createdAt: chapter.createdAt
         });
     } catch (error) {
         console.error("[Chapter Create Error]:", error);
@@ -336,33 +347,17 @@ async function createChapter(req, res) {
 async function getChapters(req, res) {
     try {
         const { courseId } = req.params;
-        const course = await fileUtils.getCourseMetadata(courseId);
-
+        
+        // Verify course exists
+        const course = await dbUtils.getCourseById(courseId);
         if (!course) {
             return res.status(404).json({ error: 'Course not found' });
         }
 
-        // Get full chapter details
-        const chapters = await Promise.all(
-            course.chapters.map(async (chapterRef) => {
-                const chapter = await fileUtils.getChapterMetadata(courseId, chapterRef.id);
-                return chapter ? {
-                    id: chapter.id,
-                    chapterName: chapter.chapterName,
-                    chapterDescription: chapter.chapterDescription,
-                    videoLink: chapter.videoLink || null,
-                    numPagesText: chapter.numPagesText,
-                    numPagesVisual: chapter.numPagesVisual,
-                    numPagesStatements: chapter.numPagesStatements,
-                    statementsCount: chapter.statementsCount,
-                    webpImages: chapter.webpImages || [],
-                    webpConversionStatus: chapter.webpConversionStatus,
-                    createdAt: chapter.timestamp
-                } : null;
-            })
-        );
+        // Get all chapters from database
+        const chapters = await dbUtils.getChaptersByCourseId(courseId);
 
-        res.json(chapters.filter(ch => ch !== null));
+        res.json(chapters);
     } catch (error) {
         console.error("[Chapters List Error]:", error);
         res.status(500).json({
@@ -379,7 +374,7 @@ async function getChapters(req, res) {
 async function getChapter(req, res) {
     try {
         const { courseId, chapterId } = req.params;
-        const chapter = await fileUtils.getChapterMetadata(courseId, chapterId);
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
 
         if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
@@ -404,7 +399,7 @@ async function getChapterFile(req, res) {
         const { courseId, chapterId } = req.params;
         const { type = 'visual', page } = req.query;
 
-        const chapter = await fileUtils.getChapterMetadata(courseId, chapterId);
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
         if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
@@ -487,13 +482,13 @@ async function summarizeChapter(req, res) {
         const { courseId, chapterId } = req.params;
         const { language } = req.query;
 
-        const chapter = await fileUtils.getChapterMetadata(courseId, chapterId);
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
         if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
 
         // If chapter has video_link but no text content, return error
-        if (chapter.videoLink && !chapter.text) {
+        if (chapter.videoLink && !chapter.textContent) {
             return res.status(400).json({ 
                 error: 'Summary is not available for chapters with video links only. This chapter uses a video_link and does not have text content for summarization.' 
             });
@@ -513,7 +508,7 @@ async function summarizeChapter(req, res) {
             summary = chapter.summary;
             wavBuffer = await fileUtils.readAudioFile(summaryAudioId);
         } else {
-            const text = chapter.text || await fileUtils.getChapterText(chapterId);
+            const text = chapter.textContent || null;
             
             if (!text) {
                 return res.status(404).json({ error: 'Chapter content not found' });
@@ -588,7 +583,7 @@ async function generateChapterLipSync(req, res) {
         const { courseId, chapterId } = req.params;
         const force = req.query?.force === 'true';
 
-        const chapter = await fileUtils.getChapterMetadata(courseId, chapterId);
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
         if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
@@ -637,7 +632,7 @@ async function generateChapterLipSync(req, res) {
 async function getChapterPageTimings(req, res) {
     try {
         const { courseId, chapterId } = req.params;
-        const chapter = await fileUtils.getChapterMetadata(courseId, chapterId);
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
 
         if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
@@ -791,7 +786,7 @@ async function getChapterPageTimings(req, res) {
 async function getChapterStatements(req, res) {
     try {
         const { courseId, chapterId } = req.params;
-        const chapter = await fileUtils.getChapterMetadata(courseId, chapterId);
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
 
         if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
