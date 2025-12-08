@@ -51,6 +51,24 @@
             </div>
         </header>
 
+        <!-- Navigation Tabs -->
+        <div class="mb-6 flex gap-4 border-b border-gray-200">
+            <button 
+                id="tabCourses" 
+                class="px-6 py-3 font-semibold text-gray-700 border-b-2 border-blue-500 transition-colors"
+            >
+                <i class="fas fa-book mr-2"></i>
+                Courses
+            </button>
+            <button 
+                id="tabUsers" 
+                class="px-6 py-3 font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors"
+            >
+                <i class="fas fa-users mr-2"></i>
+                Users
+            </button>
+        </div>
+
         <!-- Courses List View -->
         <div id="coursesListView" class="fade-in">
             <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
@@ -327,6 +345,96 @@
                 </div>
                 <div id="modalContent" class="p-6">
                     <!-- Modal content will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit User Modal -->
+        <div id="userModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                    <h3 id="userModalTitle" class="text-2xl font-semibold text-gray-800">Add New User</h3>
+                    <button id="closeUserModal" class="text-gray-400 hover:text-gray-600 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="inpUserEmail" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-envelope mr-2 text-indigo-500"></i>
+                                Email <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="email"
+                                id="inpUserEmail"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="user@example.com"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label for="inpUserName" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-user mr-2 text-indigo-500"></i>
+                                Full Name (optional)
+                            </label>
+                            <input
+                                type="text"
+                                id="inpUserName"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="John Doe"
+                            />
+                        </div>
+                        <div>
+                            <label for="inpUserPassword" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-key mr-2 text-indigo-500"></i>
+                                Password <span class="text-red-500" id="passwordRequired">*</span>
+                            </label>
+                            <input
+                                type="password"
+                                id="inpUserPassword"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Minimum 6 characters"
+                                minlength="6"
+                            />
+                            <p class="text-xs text-gray-500 mt-1" id="passwordHint">Leave empty to keep current password (when editing)</p>
+                        </div>
+                        <div>
+                            <label for="selUserRole" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-user-shield mr-2 text-indigo-500"></i>
+                                Role <span class="text-red-500">*</span>
+                            </label>
+                            <select
+                                id="selUserRole"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                            >
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    id="chkUserActive"
+                                    class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    checked
+                                />
+                                <span class="text-sm font-semibold text-gray-700">Active Account</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1 ml-7">Inactive users cannot log in</p>
+                        </div>
+                        <button 
+                            type="button" 
+                            id="btnSaveUser" 
+                            class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <i class="fas fa-save mr-2"></i>
+                            <span id="btnSaveUserText">Create User</span>
+                        </button>
+                        <div id="userResult" class="hidden mt-4"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1169,6 +1277,300 @@
         document.getElementById('addChapterModal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('addChapterModal')) {
                 document.getElementById('addChapterModal').classList.add('hidden');
+            }
+        });
+
+        // User Management Variables
+        let currentEditingUserId = null;
+
+        // Tab Switching
+        document.getElementById('tabCourses').addEventListener('click', () => {
+            document.getElementById('tabCourses').classList.add('border-blue-500', 'text-gray-700');
+            document.getElementById('tabCourses').classList.remove('border-transparent', 'text-gray-500');
+            document.getElementById('tabUsers').classList.remove('border-blue-500', 'text-gray-700');
+            document.getElementById('tabUsers').classList.add('border-transparent', 'text-gray-500');
+            document.getElementById('coursesListView').classList.remove('hidden');
+            document.getElementById('usersListView').classList.add('hidden');
+        });
+
+        document.getElementById('tabUsers').addEventListener('click', () => {
+            document.getElementById('tabUsers').classList.add('border-blue-500', 'text-gray-700');
+            document.getElementById('tabUsers').classList.remove('border-transparent', 'text-gray-500');
+            document.getElementById('tabCourses').classList.remove('border-blue-500', 'text-gray-700');
+            document.getElementById('tabCourses').classList.add('border-transparent', 'text-gray-500');
+            document.getElementById('usersListView').classList.remove('hidden');
+            document.getElementById('coursesListView').classList.add('hidden');
+            loadUsers();
+        });
+
+        // Load Users
+        async function loadUsers() {
+            const loadingEl = document.getElementById('usersLoading');
+            const emptyEl = document.getElementById('usersEmptyState');
+            const tableEl = document.getElementById('usersTable');
+            const tableBody = document.getElementById('usersTableBody');
+
+            loadingEl.classList.remove('hidden');
+            emptyEl.classList.add('hidden');
+            tableEl.classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/users`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load users');
+                }
+
+                const users = await response.json();
+                loadingEl.classList.add('hidden');
+
+                if (users.length === 0) {
+                    emptyEl.classList.remove('hidden');
+                } else {
+                    tableEl.classList.remove('hidden');
+                    renderUsers(users);
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                loadingEl.classList.add('hidden');
+                emptyEl.classList.remove('hidden');
+                emptyEl.innerHTML = `
+                    <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-4"></i>
+                    <p class="text-red-500 text-lg">Error loading users</p>
+                    <p class="text-gray-400 text-sm mt-2">${error.message}</p>
+                `;
+            }
+        }
+
+        // Render Users Table
+        function renderUsers(users) {
+            const tableBody = document.getElementById('usersTableBody');
+            tableBody.innerHTML = users.map(user => {
+                const formatDate = (date) => {
+                    if (!date) return 'Never';
+                    return new Date(date).toLocaleString();
+                };
+
+                const roleBadge = user.role === 'admin' 
+                    ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">Admin</span>'
+                    : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">User</span>';
+
+                const statusBadge = user.isActive
+                    ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>'
+                    : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Inactive</span>';
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.email}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.name || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">${roleBadge}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">${statusBadge}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(user.lastLogin)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button 
+                                onclick="editUser(${user.id})" 
+                                class="text-indigo-600 hover:text-indigo-900 mr-3"
+                                title="Edit user"
+                            >
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button 
+                                onclick="deleteUser(${user.id}, '${user.email.replace(/'/g, "\\'")}')" 
+                                class="text-red-600 hover:text-red-900"
+                                title="Delete user"
+                            >
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Open Add User Modal
+        document.getElementById('btnAddUser').addEventListener('click', () => {
+            currentEditingUserId = null;
+            document.getElementById('userModalTitle').textContent = 'Add New User';
+            document.getElementById('btnSaveUserText').textContent = 'Create User';
+            document.getElementById('passwordRequired').classList.remove('hidden');
+            document.getElementById('passwordHint').textContent = 'Minimum 6 characters';
+            document.getElementById('inpUserPassword').required = true;
+            
+            // Reset form
+            document.getElementById('inpUserEmail').value = '';
+            document.getElementById('inpUserName').value = '';
+            document.getElementById('inpUserPassword').value = '';
+            document.getElementById('selUserRole').value = 'user';
+            document.getElementById('chkUserActive').checked = true;
+            document.getElementById('userResult').classList.add('hidden');
+            
+            document.getElementById('userModal').classList.remove('hidden');
+        });
+
+        // Edit User
+        window.editUser = async function(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/users/${userId}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load user');
+                }
+
+                const user = await response.json();
+                currentEditingUserId = userId;
+
+                document.getElementById('userModalTitle').textContent = 'Edit User';
+                document.getElementById('btnSaveUserText').textContent = 'Update User';
+                document.getElementById('passwordRequired').classList.add('hidden');
+                document.getElementById('passwordHint').textContent = 'Leave empty to keep current password';
+                document.getElementById('inpUserPassword').required = false;
+
+                document.getElementById('inpUserEmail').value = user.email;
+                document.getElementById('inpUserName').value = user.name || '';
+                document.getElementById('inpUserPassword').value = '';
+                document.getElementById('selUserRole').value = user.role;
+                document.getElementById('chkUserActive').checked = user.isActive;
+                document.getElementById('userResult').classList.add('hidden');
+
+                document.getElementById('userModal').classList.remove('hidden');
+            } catch (error) {
+                alert('Error loading user: ' + error.message);
+            }
+        };
+
+        // Save User (Create or Update)
+        document.getElementById('btnSaveUser').addEventListener('click', async () => {
+            const email = document.getElementById('inpUserEmail').value.trim();
+            const name = document.getElementById('inpUserName').value.trim();
+            const password = document.getElementById('inpUserPassword').value;
+            const role = document.getElementById('selUserRole').value;
+            const isActive = document.getElementById('chkUserActive').checked;
+
+            if (!email) {
+                alert('Email is required');
+                return;
+            }
+
+            if (!currentEditingUserId && !password) {
+                alert('Password is required for new users');
+                return;
+            }
+
+            if (password && password.length < 6) {
+                alert('Password must be at least 6 characters long');
+                return;
+            }
+
+            const btnSave = document.getElementById('btnSaveUser');
+            const resultDiv = document.getElementById('userResult');
+            btnSave.disabled = true;
+            resultDiv.classList.add('hidden');
+
+            try {
+                const userData = {
+                    email,
+                    name: name || null,
+                    role,
+                    isActive
+                };
+
+                if (password) {
+                    userData.password = password;
+                }
+
+                let response;
+                if (currentEditingUserId) {
+                    // Update existing user
+                    response = await fetch(`${API_BASE}/api/users/${currentEditingUserId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(userData)
+                    });
+                } else {
+                    // Create new user
+                    response = await fetch(`${API_BASE}/api/users`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(userData)
+                    });
+                }
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
+                    resultDiv.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                            <span class="text-green-700 font-medium">User ${currentEditingUserId ? 'updated' : 'created'} successfully!</span>
+                        </div>
+                    `;
+                    resultDiv.classList.remove('hidden');
+
+                    // Reload users list
+                    setTimeout(() => {
+                        loadUsers();
+                        document.getElementById('userModal').classList.add('hidden');
+                    }, 1000);
+                } else {
+                    throw new Error(data.error || 'Failed to save user');
+                }
+            } catch (error) {
+                resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
+                resultDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                        <span class="text-red-700 font-medium">Error: ${error.message}</span>
+                    </div>
+                `;
+                resultDiv.classList.remove('hidden');
+            } finally {
+                btnSave.disabled = false;
+            }
+        });
+
+        // Delete User
+        window.deleteUser = async function(userId, userEmail) {
+            if (!confirm(`Are you sure you want to delete user "${userEmail}"?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/users/${userId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('User deleted successfully');
+                    loadUsers();
+                } else {
+                    throw new Error(data.error || 'Failed to delete user');
+                }
+            } catch (error) {
+                alert('Error deleting user: ' + error.message);
+            }
+        };
+
+        // Close User Modal
+        document.getElementById('closeUserModal').addEventListener('click', () => {
+            document.getElementById('userModal').classList.add('hidden');
+            currentEditingUserId = null;
+        });
+
+        document.getElementById('userModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('userModal')) {
+                document.getElementById('userModal').classList.add('hidden');
+                currentEditingUserId = null;
             }
         });
 

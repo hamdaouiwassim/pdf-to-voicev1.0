@@ -21,6 +21,7 @@ const labRoutes = require('./routes/labRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const chapterRoutes = require('./routes/chapterRoutes');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 // Initialize Express app
 const app = express();
@@ -97,6 +98,9 @@ app.use('/api/lab', labRoutes);
 // Course and Chapter routes (protected)
 app.use('/api/courses', requireAuth, courseRoutes);
 app.use('/api/courses/:courseId/chapters', requireAuth, chapterRoutes);
+
+// User management routes (protected)
+app.use('/api/users', requireAuth, userRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

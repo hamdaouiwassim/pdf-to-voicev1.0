@@ -17,13 +17,19 @@ const db = require('../config/database');
 async function createCourse(courseData) {
     const { id, courseName, courseDescription } = courseData;
     
-    await db.query(
-        `INSERT INTO courses (id, course_name, course_description) 
-         VALUES (?, ?, ?)`,
-        [id, courseName, courseDescription || null]
-    );
-    
-    return await getCourseById(id);
+    try {
+        await db.query(
+            `INSERT INTO courses (id, course_name, course_description) 
+             VALUES (?, ?, ?)`,
+            [id, courseName, courseDescription || null]
+        );
+        
+        console.log(`[DB] Course created successfully: ${id} - ${courseName}`);
+        return await getCourseById(id);
+    } catch (error) {
+        console.error('[DB] Error creating course:', error);
+        throw error;
+    }
 }
 
 /**
