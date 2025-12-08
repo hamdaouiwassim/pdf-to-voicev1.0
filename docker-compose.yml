@@ -47,6 +47,7 @@ services:
       - ./audios:/app/audios
       - ./temp:/app/temp
       - ./.env:/app/.env
+      - ./scripts:/app/scripts
     depends_on:
       mysql:
         condition: service_healthy
