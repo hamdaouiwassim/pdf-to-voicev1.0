@@ -1,8 +1,5 @@
-const config = require('../config/config');
-
-// Admin credentials from environment or defaults
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@titanacademy.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const bcrypt = require('bcrypt');
+const db = require('../config/database');
 
 /**
  * Validate email format
@@ -43,28 +40,56 @@ async function login(req, res) {
         // Normalize email (lowercase)
         const normalizedEmail = email.toLowerCase().trim();
 
-        // Validate credentials
-        if (normalizedEmail === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
-            // Create session
-            req.session.authenticated = true;
-            req.session.email = normalizedEmail;
-            req.session.loginTime = new Date().toISOString();
-            
-            // Set session expiration (24 hours)
-            req.session.cookie.maxAge = 24 * 60 * 60 * 1000;
+        // Query user from database
+        const users = await db.query(
+            'SELECT id, email, password, name, role, is_active FROM users WHERE email = ? AND is_active = TRUE',
+            [normalizedEmail]
+        );
 
-            return res.json({
-                success: true,
-                message: 'Login successful',
-                authenticated: true,
-                email: normalizedEmail
-            });
-        } else {
+        if (users.length === 0) {
             return res.status(401).json({ 
                 error: 'Invalid email or password',
                 authenticated: false
             });
         }
+
+        const user = users[0];
+
+        // Verify password
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        
+        if (!passwordMatch) {
+            return res.status(401).json({ 
+                error: 'Invalid email or password',
+                authenticated: false
+            });
+        }
+
+        // Update last login timestamp
+        await db.query(
+            'UPDATE users SET last_login = NOW() WHERE id = ?',
+            [user.id]
+        );
+
+        // Create session
+        req.session.authenticated = true;
+        req.session.userId = user.id;
+        req.session.email = user.email;
+        req.session.name = user.name;
+        req.session.role = user.role;
+        req.session.loginTime = new Date().toISOString();
+        
+        // Set session expiration (24 hours)
+        req.session.cookie.maxAge = 24 * 60 * 60 * 1000;
+
+        return res.json({
+            success: true,
+            message: 'Login successful',
+            authenticated: true,
+            email: user.email,
+            name: user.name,
+            role: user.role
+        });
     } catch (error) {
         console.error("[Auth Login Error]:", error);
         res.status(500).json({
@@ -115,6 +140,8 @@ async function getAuthStatus(req, res) {
         res.json({
             authenticated: isAuthenticated,
             email: req.session?.email || null,
+            name: req.session?.name || null,
+            role: req.session?.role || null,
             loginTime: req.session?.loginTime || null
         });
     } catch (error) {
