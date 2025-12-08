@@ -133,14 +133,20 @@ GEMINI_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ### MySQL Database Configuration
 
 #### `DB_HOST`
-- **Default:** `localhost`
+- **Default:** `localhost` (dev mode) or `mysql` (production/Docker)
 - **Description:** MySQL database host address
+- **Behavior:**
+  - If `NODE_ENV=dev` or `NODE_ENV=development`: Always uses `localhost` (ignores this variable)
+  - Otherwise: Uses this value or defaults to `mysql` (for Docker)
 - **Example:** `DB_HOST=localhost` or `DB_HOST=127.0.0.1`
 
 #### `DB_PORT`
-- **Default:** `3306`
+- **Default:** `3307` (dev mode) or `3306` (production/Docker)
 - **Description:** MySQL database port number
-- **Example:** `DB_PORT=3306`
+- **Behavior:**
+  - If `NODE_ENV=dev` or `NODE_ENV=development`: Defaults to `3307` (external Docker port)
+  - Otherwise: Defaults to `3306` (internal Docker port)
+- **Example:** `DB_PORT=3307` (for local MySQL) or `DB_PORT=3306` (for Docker)
 
 #### `DB_USER`
 - **Default:** `root`
@@ -259,11 +265,17 @@ These are **highly recommended** to avoid Google Gemini rate limits.
 #### `NODE_ENV`
 - **Default:** Not set
 - **Description:** Environment mode
-- **Options:** `development`, `production`
+- **Options:** `dev`, `development`, `production`
 - **Effect:** 
-  - `development`: Shows detailed error stack traces
-  - `production`: Hides stack traces for security
-- **Example:** `NODE_ENV=development`
+  - `dev` or `development`: 
+    - Shows detailed error stack traces
+    - **Forces database connection to `localhost`** (ignores `DB_HOST`)
+    - Uses external port `3307` by default (for local MySQL)
+  - `production`: 
+    - Hides stack traces for security
+    - Uses `DB_HOST` from environment or defaults to `mysql` (Docker service name)
+    - Uses internal port `3306` by default
+- **Example:** `NODE_ENV=dev` or `NODE_ENV=development`
 
 ---
 

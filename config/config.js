@@ -5,15 +5,28 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
+// Determine if we're in development mode
+const isDev = process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'development';
+
+// Log database connection info in development
+if (isDev) {
+    console.log('[DEV MODE] Database will connect to localhost');
+}
+
 const config = {
     // Server Configuration
     PORT: process.env.PORT || 3000,
     
     // Database Configuration
-    DB_HOST: process.env.DB_HOST || 'localhost',
-    DB_PORT: process.env.DB_PORT || 3306,
-    DB_USER: process.env.DB_USER || 'root',
-    DB_PASSWORD: process.env.DB_PASSWORD || '',
+    // In development mode, always connect to localhost (for local MySQL)
+    // In production/Docker, use DB_HOST from environment (defaults to 'mysql' in Docker)
+    DB_HOST: isDev ? 'localhost' : (process.env.DB_HOST || 'mysql'),
+    // In development, use external port (3307), in production use internal port (3306)
+    DB_PORT: isDev ? '3306' : (process.env.DB_PORT || 3306),
+    // In dev mode, always use 'root' with null password for localhost
+    // In production, use environment variables or defaults
+    DB_USER: isDev ? 'root' : (process.env.DB_USER || 'app_user'),
+    DB_PASSWORD: isDev ? '' : (process.env.DB_PASSWORD || 'app_password'),
     DB_NAME: process.env.DB_NAME || 'titan_academy',
     DB_CONNECTION_LIMIT: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
     

@@ -51,9 +51,13 @@ app.use(session({
 
 app.use(express.json());
 
-// Protect index.html - redirect to login if not authenticated
+// Protect index.html and users.html - redirect to login if not authenticated
 app.get('/index.html', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/users.html', requireAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'users.html'));
 });
 
 // Serve static files (login.html is public, index.html is protected above)

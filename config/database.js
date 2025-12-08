@@ -19,11 +19,11 @@ const pool = mysql.createPool({
 async function testConnection() {
     try {
         const connection = await pool.getConnection();
-        console.log('✓ MySQL database connected successfully');
+        console.log(`✓ MySQL database connected successfully (${config.DB_HOST}:${config.DB_PORT})`);
         connection.release();
         return true;
     } catch (error) {
-        console.error('✗ MySQL database connection failed:', error.message);
+        console.error(`✗ MySQL database connection failed (${config.DB_HOST}:${config.DB_PORT}):`, error.message);
         return false;
     }
 }

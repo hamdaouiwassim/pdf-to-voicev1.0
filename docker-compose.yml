@@ -36,7 +36,9 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=3002
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DB_HOST=mysql
+      # In Docker, always use 'mysql' as host (service name)
+      # DB_HOST will be overridden by config.js if NODE_ENV is dev
+      - DB_HOST=${DB_HOST:-mysql}
       - DB_PORT=3306
       - DB_USER=${DB_USER:-app_user}
       - DB_PASSWORD=${DB_PASSWORD:-app_password}
