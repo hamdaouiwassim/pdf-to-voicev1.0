@@ -132,8 +132,11 @@ async function createChapter(req, res) {
         }
 
         // File validation is handled by middleware
-        const textPdfBuffer = req.files.textPdfFile.data;
-        const visualPdfBuffer = req.files.visualPdfFile.data;
+        const videoLink = typeof req.body?.video_link === 'string' ? req.body.video_link.trim() : null;
+        const hasVideoLink = videoLink && videoLink.length > 0;
+        
+        const textPdfFile = req.files?.textPdfFile;
+        const visualPdfFile = req.files?.visualPdfFile;
         const statementsPdfFile = req.files?.statementsPdfFile;
         const chapterName = typeof req.body?.chapterName === 'string' ? req.body.chapterName.trim() : '';
         const chapterDescription = typeof req.body?.chapterDescription === 'string' ? req.body.chapterDescription.trim() : '';
@@ -145,102 +148,126 @@ async function createChapter(req, res) {
         const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
         await fsPromises.mkdir(chapterDir, { recursive: true });
 
-        // File paths
-        const textPdfFilename = `${chapterId}_text${constants.FILE_EXTENSIONS.PDF}`;
-        const visualPdfFilename = `${chapterId}_visual${constants.FILE_EXTENSIONS.PDF}`;
-        const statementsPdfFilename = statementsPdfFile ? `${chapterId}_statements${constants.FILE_EXTENSIONS.PDF}` : null;
-        
-        const textPdfPath = path.join(chapterDir, textPdfFilename);
-        const visualPdfPath = path.join(chapterDir, visualPdfFilename);
-        const statementsPdfPath = statementsPdfFilename ? path.join(chapterDir, statementsPdfFilename) : null;
-
-        // WebP output directory
-        const webpDir = path.join(chapterDir, 'webp');
-
-        // Parse PDFs and save files
-        const textParsePromise = pdfParse(textPdfBuffer);
-        const visualParsePromise = pdfParse(visualPdfBuffer);
-        const writePromises = [
-            
-            fsPromises.writeFile(textPdfPath, textPdfBuffer),
-            fsPromises.writeFile(visualPdfPath, visualPdfBuffer)
-        ];
-
-        let statementsParsePromise = null;
-        if (statementsPdfFile) {
-            statementsParsePromise = pdfParse(statementsPdfFile.data);
-            writePromises.push(fsPromises.writeFile(statementsPdfPath, statementsPdfFile.data));
-        }
-
-        const parsePromises = [textParsePromise, visualParsePromise];
-        if (statementsParsePromise) {
-            parsePromises.push(statementsParsePromise);
-        }
-
-        const parseResults = await Promise.all(parsePromises);
-        await Promise.all(writePromises);
-
-        const textResult = parseResults[0];
-        const visualResult = parseResults[1];
-        const statementsResult = statementsParsePromise ? parseResults[2] : null;
+        // Initialize variables for PDF processing
+        let textResult = null;
+        let visualResult = null;
+        let statementsResult = null;
         let statements = [];
+        let textPdfFilename = null;
+        let visualPdfFilename = null;
+        let statementsPdfFilename = null;
+        let webpImages = [];
 
-        // Extract statements if provided
-        if (statementsPdfFile) {
-            statements = await extractStatementsByPage(chapterId, statementsPdfFile.data);
+        // Process PDFs only if video_link is not provided
+        if (!hasVideoLink) {
+            if (!textPdfFile || !visualPdfFile) {
+                return res.status(400).json({ 
+                    error: 'PDF files are required when video_link is not provided' 
+                });
+            }
 
-            if (statements.length < (statementsResult?.numpages || 0)) {
-                const pdfBuffer = statementsPdfFile.data;
-                if (pdfjsLib) {
-                    try {
-                        const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
-                        const pdfDocument = await loadingTask.promise;
-                        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-                            if (statements.find(st => st.page === pageNum)) continue;
+            const textPdfBuffer = textPdfFile.data;
+            const visualPdfBuffer = visualPdfFile.data;
 
-                            const page = await pdfDocument.getPage(pageNum);
-                            const textContent = await page.getTextContent();
-                            const lines = textContent.items
-                                .map(item => (item.str || '').trim())
-                                .filter(Boolean);
+            // File paths
+            textPdfFilename = `${chapterId}_text${constants.FILE_EXTENSIONS.PDF}`;
+            visualPdfFilename = `${chapterId}_visual${constants.FILE_EXTENSIONS.PDF}`;
+            statementsPdfFilename = statementsPdfFile ? `${chapterId}_statements${constants.FILE_EXTENSIONS.PDF}` : null;
+            
+            const textPdfPath = path.join(chapterDir, textPdfFilename);
+            const visualPdfPath = path.join(chapterDir, visualPdfFilename);
+            const statementsPdfPath = statementsPdfFilename ? path.join(chapterDir, statementsPdfFilename) : null;
 
-                            const title = lines[0]?.slice(0, 160) || `Page ${pageNum}`;
-                            const body = lines.join('\n').trim();
+            // WebP output directory
+            const webpDir = path.join(chapterDir, 'webp');
 
-                            statements.push({
-                                id: `${chapterId}-statement-${pageNum}`,
-                                order: pageNum,
-                                page: pageNum,
-                                title,
-                                body: body || '(Page vide)'
-                            });
+            // Parse PDFs and save files
+            const textParsePromise = pdfParse(textPdfBuffer);
+            const visualParsePromise = pdfParse(visualPdfBuffer);
+            const writePromises = [
+                fsPromises.writeFile(textPdfPath, textPdfBuffer),
+                fsPromises.writeFile(visualPdfPath, visualPdfBuffer)
+            ];
+
+            let statementsParsePromise = null;
+            if (statementsPdfFile) {
+                statementsParsePromise = pdfParse(statementsPdfFile.data);
+                writePromises.push(fsPromises.writeFile(statementsPdfPath, statementsPdfFile.data));
+            }
+
+            const parsePromises = [textParsePromise, visualParsePromise];
+            if (statementsParsePromise) {
+                parsePromises.push(statementsParsePromise);
+            }
+
+            const parseResults = await Promise.all(parsePromises);
+            await Promise.all(writePromises);
+
+            textResult = parseResults[0];
+            visualResult = parseResults[1];
+            statementsResult = statementsParsePromise ? parseResults[2] : null;
+
+            // Extract statements if provided
+            if (statementsPdfFile) {
+                statements = await extractStatementsByPage(chapterId, statementsPdfFile.data);
+
+                if (statements.length < (statementsResult?.numpages || 0)) {
+                    const pdfBuffer = statementsPdfFile.data;
+                    if (pdfjsLib) {
+                        try {
+                            const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+                            const pdfDocument = await loadingTask.promise;
+                            for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+                                if (statements.find(st => st.page === pageNum)) continue;
+
+                                const page = await pdfDocument.getPage(pageNum);
+                                const textContent = await page.getTextContent();
+                                const lines = textContent.items
+                                    .map(item => (item.str || '').trim())
+                                    .filter(Boolean);
+
+                                const title = lines[0]?.slice(0, 160) || `Page ${pageNum}`;
+                                const body = lines.join('\n').trim();
+
+                                statements.push({
+                                    id: `${chapterId}-statement-${pageNum}`,
+                                    order: pageNum,
+                                    page: pageNum,
+                                    title,
+                                    body: body || '(Page vide)'
+                                });
+                            }
+                            statements.sort((a, b) => a.page - b.page);
+                        } catch (innerError) {
+                            console.warn('[Statements] Unable to backfill pages:', innerError.message);
                         }
-                        statements.sort((a, b) => a.page - b.page);
-                    } catch (innerError) {
-                        console.warn('[Statements] Unable to backfill pages:', innerError.message);
                     }
                 }
             }
+
+            if ((!statements || statements.length === 0) && statementsResult?.text) {
+                statements = buildStatementsFromText(chapterId, statementsResult.text);
+            }
+
+            // Convert visual PDF to WebP images (scale 2000, high quality)
+            try {
+                console.log(`[Chapter] Converting visual PDF to WebP for chapter ${chapterId}...`);
+                webpImages = await pdfToWebpUtils.convertPdfToWebp(visualPdfPath, webpDir, 2000);
+                console.log(`[Chapter] Converted ${webpImages.length} pages to WebP`);
+            } catch (error) {
+                console.warn(`[Chapter] Failed to convert PDF to WebP: ${error.message}`);
+                // Continue even if WebP conversion fails
+            }
         }
 
-        if ((!statements || statements.length === 0) && statementsResult?.text) {
-            statements = buildStatementsFromText(chapterId, statementsResult.text);
+        // Generate chapter name
+        let title = chapterName;
+        if (!title && !hasVideoLink && visualPdfFile) {
+            title = visualPdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, '');
         }
-
-        // Convert visual PDF to WebP images (scale 2000, high quality)
-        let webpImages = [];
-        try {
-            console.log(`[Chapter] Converting visual PDF to WebP for chapter ${chapterId}...`);
-            webpImages = await pdfToWebpUtils.convertPdfToWebp(visualPdfPath, webpDir, 2000);
-            console.log(`[Chapter] Converted ${webpImages.length} pages to WebP`);
-        } catch (error) {
-            console.warn(`[Chapter] Failed to convert PDF to WebP: ${error.message}`);
-            // Continue even if WebP conversion fails
+        if (!title) {
+            title = `Chapter ${chapterId.substring(0, 8)}`;
         }
-
-        // Generate chapter name from visual PDF filename if not provided
-        const derivedTitle = req.files.visualPdfFile.name.replace(constants.FILE_EXTENSIONS.PDF, '');
-        const title = chapterName || derivedTitle;
 
         // Create chapter metadata
         const chapterData = {
@@ -248,13 +275,14 @@ async function createChapter(req, res) {
             courseId: courseId,
             chapterName: title,
             chapterDescription: chapterDescription || null,
-            text: textResult.text,
+            videoLink: videoLink || null,
+            text: textResult?.text || null,
             textFilename: textPdfFilename,
             visualFilename: visualPdfFilename,
             statementsFilename: statementsPdfFilename,
-            length: textResult.text.length,
-            numPagesText: textResult.numpages || 1,
-            numPagesVisual: visualResult.numpages || 1,
+            length: textResult?.text?.length || 0,
+            numPagesText: textResult?.numpages || 0,
+            numPagesVisual: visualResult?.numpages || 0,
             numPagesStatements: statementsResult?.numpages || 0,
             statementsCount: statements?.length || 0,
             statements: statements,
@@ -270,6 +298,7 @@ async function createChapter(req, res) {
             id: chapterId,
             chapterName: title,
             chapterDescription: chapterDescription || null,
+            videoLink: videoLink || null,
             createdAt: chapterData.timestamp
         });
         course.updatedAt = new Date().toISOString();
@@ -280,6 +309,7 @@ async function createChapter(req, res) {
             courseId: courseId,
             chapterName: chapterData.chapterName,
             chapterDescription: chapterData.chapterDescription,
+            videoLink: chapterData.videoLink,
             textFilename: chapterData.textFilename,
             visualFilename: chapterData.visualFilename,
             statementsFilename: chapterData.statementsFilename,
@@ -320,6 +350,7 @@ async function getChapters(req, res) {
                     id: chapter.id,
                     chapterName: chapter.chapterName,
                     chapterDescription: chapter.chapterDescription,
+                    videoLink: chapter.videoLink || null,
                     numPagesText: chapter.numPagesText,
                     numPagesVisual: chapter.numPagesVisual,
                     numPagesStatements: chapter.numPagesStatements,
@@ -378,6 +409,13 @@ async function getChapterFile(req, res) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
 
+        // If chapter has video_link but no PDF files, return error
+        if (chapter.videoLink && !chapter.visualFilename && !chapter.textFilename) {
+            return res.status(400).json({ 
+                error: 'This chapter uses a video link and does not have PDF files. Use the video_link field instead.' 
+            });
+        }
+
         const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
 
         if (type === 'webp' && page) {
@@ -409,9 +447,15 @@ async function getChapterFile(req, res) {
             let filename;
 
             if (type === 'text') {
+                if (!chapter.textFilename) {
+                    return res.status(404).json({ error: 'Text PDF file not available for this chapter' });
+                }
                 pdfFilePath = path.join(chapterDir, chapter.textFilename);
                 filename = chapter.textFilename;
             } else {
+                if (!chapter.visualFilename) {
+                    return res.status(404).json({ error: 'Visual PDF file not available for this chapter' });
+                }
                 pdfFilePath = path.join(chapterDir, chapter.visualFilename);
                 filename = chapter.visualFilename;
             }
@@ -446,6 +490,13 @@ async function summarizeChapter(req, res) {
         const chapter = await fileUtils.getChapterMetadata(courseId, chapterId);
         if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        // If chapter has video_link but no text content, return error
+        if (chapter.videoLink && !chapter.text) {
+            return res.status(400).json({ 
+                error: 'Summary is not available for chapters with video links only. This chapter uses a video_link and does not have text content for summarization.' 
+            });
         }
 
         const summaryAudioId = `${chapterId}${constants.AUDIO_PREFIXES.SUMMARY}`;

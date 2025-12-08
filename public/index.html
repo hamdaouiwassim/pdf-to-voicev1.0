@@ -28,11 +28,27 @@
     <div class="container mx-auto px-4 py-8 max-w-7xl">
         <!-- Header -->
         <header class="text-center mb-12 fade-in">
-            <h1 class="text-5xl font-bold text-gray-800 mb-3">
-                <i class="fas fa-graduation-cap text-red-500 mr-3"></i>
-                Titan Academy : Course & Chapter Manager
-            </h1>
-            <p class="text-gray-600 text-lg">Create courses, add chapters with PDFs, and manage your content</p>
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex-1"></div>
+                <div class="flex-1 text-center">
+                    <h1 class="text-5xl font-bold text-gray-800 mb-3">
+                        <i class="fas fa-graduation-cap text-red-500 mr-3"></i>
+                        Titan Academy : Course & Chapter Manager
+                    </h1>
+                    <p class="text-gray-600 text-lg">Create courses, add chapters with PDFs, and manage your content</p>
+                </div>
+                <div class="flex-1 flex justify-end items-center gap-3">
+                    <span id="userEmail" class="hidden text-sm text-gray-600 font-medium"></span>
+                    <button 
+                        id="btnLogout" 
+                        class="hidden bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition-all flex items-center"
+                        title="Logout"
+                    >
+                        <i class="fas fa-sign-out-alt mr-2"></i>
+                        Logout
+                    </button>
+                </div>
+            </div>
         </header>
 
         <!-- Courses List View -->
@@ -177,7 +193,15 @@
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 space-y-2">
                         <p class="text-sm text-blue-800 flex items-center gap-2">
                             <i class="fas fa-info-circle"></i>
-                            <span><strong>Required:</strong> Upload two PDFs — one with text content (for TTS) and one for presentation (for display). The visual PDF will be converted to WebP images.</span>
+                            <span><strong>Required:</strong> Text PDF (for TTS) is always required for voice synthesis.</span>
+                        </p>
+                        <p class="text-sm text-blue-800 flex items-center gap-2">
+                            <i class="fas fa-video text-purple-500"></i>
+                            <span><strong>Video Link:</strong> If provided, the visual PDF input will be hidden. The video link replaces the presentation PDF.</span>
+                        </p>
+                        <p class="text-sm text-blue-800 flex items-center gap-2">
+                            <i class="fas fa-file-image text-purple-500"></i>
+                            <span><strong>Visual PDF:</strong> Required only when video link is not provided. Will be converted to WebP images.</span>
                         </p>
                         <p class="text-sm text-blue-800 flex items-center gap-2">
                             <i class="fas fa-lightbulb text-yellow-500"></i>
@@ -186,6 +210,19 @@
                     </div>
 
                     <div class="space-y-4 mb-6">
+                        <div>
+                            <label for="inpVideoLink" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-video text-purple-500 mr-2"></i>
+                                Video Link (optional)
+                            </label>
+                            <input
+                                type="url"
+                                id="inpVideoLink"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                placeholder="https://example.com/video.mp4"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">If provided, the visual PDF input will be hidden</p>
+                        </div>
                         <div>
                             <label for="inpChapterName" class="block text-sm font-semibold text-gray-700 mb-2">
                                 Chapter Name (optional)
@@ -216,17 +253,17 @@
                             <input type="file" id="inpTextFile" accept=".pdf" class="hidden">
                             <label for="inpTextFile" class="cursor-pointer">
                                 <i class="fas fa-file-alt text-4xl text-green-500 mb-2"></i>
-                                <p class="text-gray-700 font-medium mb-1">Text PDF (for TTS)</p>
-                                <p class="text-sm text-gray-500">PDF containing the full text content for voice synthesis</p>
+                                <p class="text-gray-700 font-medium mb-1">Text PDF (for TTS) <span class="text-red-500">*</span></p>
+                                <p class="text-sm text-gray-500">PDF containing the full text content for voice synthesis (required)</p>
                             </label>
                             <div id="textFileName" class="mt-2 text-green-600 font-medium text-sm hidden"></div>
                         </div>
 
-                        <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+                        <div id="visualPdfContainer" class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
                             <input type="file" id="inpVisualFile" accept=".pdf" class="hidden">
                             <label for="inpVisualFile" class="cursor-pointer">
                                 <i class="fas fa-file-image text-4xl text-purple-500 mb-2"></i>
-                                <p class="text-gray-700 font-medium mb-1">Presentation PDF (for display)</p>
+                                <p class="text-gray-700 font-medium mb-1">Presentation PDF (for display) <span class="text-red-500">*</span></p>
                                 <p class="text-sm text-gray-500">PDF to be shown to users (will be converted to WebP images)</p>
                             </label>
                             <div id="visualFileName" class="mt-2 text-purple-600 font-medium text-sm hidden"></div>
@@ -293,13 +330,84 @@
                 </div>
             </div>
         </div>
+
     </div>
 
     <script>
         const API_BASE = window.location.origin;
+        
         let currentCourseId = null;
         let currentChapterId = null;
         let currentCourse = null;
+        let isAuthenticated = false;
+
+        // Authentication Functions
+        async function checkAuthentication() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/status`, {
+                    credentials: 'include' // Important for session cookies
+                });
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    isAuthenticated = true;
+                    showAuthenticatedUI(data);
+                    return true;
+                } else {
+                    // Not authenticated, redirect to login
+                    window.location.href = '/login.html';
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking authentication:', error);
+                // On error, redirect to login
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        function showAuthenticatedUI(authData) {
+            isAuthenticated = true;
+            document.getElementById('btnLogout').classList.remove('hidden');
+            
+            // Display user email if available
+            if (authData && authData.email) {
+                const emailDisplay = document.getElementById('userEmail');
+                emailDisplay.textContent = authData.email;
+                emailDisplay.classList.remove('hidden');
+            }
+            
+            // Show management features
+            document.getElementById('btnAddCourse').style.display = 'block';
+            document.getElementById('btnAddChapter').style.display = 'block';
+        }
+
+        async function logout() {
+            if (!confirm('Are you sure you want to logout?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    // Redirect to login page
+                    window.location.href = '/login.html';
+                } else {
+                    alert('Logout failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                // Still redirect even if API call fails
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Logout Event Handler
+        document.getElementById('btnLogout').addEventListener('click', logout);
 
         // Navigation functions
         function showCoursesList() {
@@ -344,6 +452,19 @@
 
         // Close Add Chapter Modal
         document.getElementById('closeAddChapterModal').addEventListener('click', () => {
+            // Reset form when closing
+            document.getElementById('inpTextFile').value = '';
+            document.getElementById('inpVisualFile').value = '';
+            document.getElementById('inpStatementsFile').value = '';
+            document.getElementById('inpVideoLink').value = '';
+            document.getElementById('inpChapterName').value = '';
+            document.getElementById('inpChapterDescription').value = '';
+            ['textFileName', 'visualFileName', 'statementsFileName'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            // Reset visual PDF visibility
+            document.getElementById('visualPdfContainer').classList.remove('hidden');
+            document.getElementById('btnUploadChapter').disabled = true;
             document.getElementById('addChapterModal').classList.add('hidden');
         });
 
@@ -371,6 +492,7 @@
                 const response = await fetch(`${API_BASE}/api/courses`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include', // Include session cookie
                     body: JSON.stringify({ courseName, courseDescription })
                 });
 
@@ -449,11 +571,48 @@
             });
         });
 
-        function checkChapterUploadReady() {
-            const hasFiles = document.getElementById('inpTextFile').files.length > 0 && 
-                           document.getElementById('inpVisualFile').files.length > 0;
-            document.getElementById('btnUploadChapter').disabled = !hasFiles;
+        function toggleVisualPdfInput() {
+            const videoLink = document.getElementById('inpVideoLink')?.value.trim();
+            const hasVideoLink = videoLink && videoLink.length > 0;
+            const visualPdfContainer = document.getElementById('visualPdfContainer');
+            
+            if (hasVideoLink) {
+                // Hide visual PDF input when video link is provided
+                visualPdfContainer.classList.add('hidden');
+                // Clear visual file if it was selected
+                document.getElementById('inpVisualFile').value = '';
+                document.getElementById('visualFileName').classList.add('hidden');
+            } else {
+                // Show visual PDF input when video link is empty
+                visualPdfContainer.classList.remove('hidden');
+            }
+            
+            checkChapterUploadReady();
         }
+
+        function checkChapterUploadReady() {
+            const videoLink = document.getElementById('inpVideoLink')?.value.trim();
+            const hasVideoLink = videoLink && videoLink.length > 0;
+            const hasTextFile = document.getElementById('inpTextFile').files.length > 0;
+            const hasVisualFile = document.getElementById('inpVisualFile').files.length > 0;
+            
+            // Text PDF is always required
+            // Visual PDF is required only when video link is not provided
+            const isReady = hasTextFile && (hasVideoLink || hasVisualFile);
+            document.getElementById('btnUploadChapter').disabled = !isReady;
+        }
+
+        // Add event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            const videoLinkInput = document.getElementById('inpVideoLink');
+            if (videoLinkInput) {
+                videoLinkInput.addEventListener('input', toggleVisualPdfInput);
+            }
+            
+            // Also check when files are selected
+            document.getElementById('inpTextFile').addEventListener('change', checkChapterUploadReady);
+            document.getElementById('inpVisualFile').addEventListener('change', checkChapterUploadReady);
+        });
 
         // Upload Chapter
         document.getElementById('btnUploadChapter').addEventListener('click', async () => {
@@ -462,8 +621,20 @@
                 return;
             }
 
-            if (!document.getElementById('inpTextFile').files[0] || !document.getElementById('inpVisualFile').files[0]) {
-                showChapterError('Please select both PDF files (text PDF and presentation PDF)');
+            const videoLink = document.getElementById('inpVideoLink')?.value.trim();
+            const hasVideoLink = videoLink && videoLink.length > 0;
+            const hasTextFile = document.getElementById('inpTextFile').files[0];
+            const hasVisualFile = document.getElementById('inpVisualFile').files[0];
+            
+            // Text PDF is always required
+            if (!hasTextFile) {
+                showChapterError('Text PDF file is required (for TTS)');
+                return;
+            }
+            
+            // Visual PDF is required only when video link is not provided
+            if (!hasVideoLink && !hasVisualFile) {
+                showChapterError('Please provide either a video link or a visual PDF file');
                 return;
             }
 
@@ -481,8 +652,19 @@
             btn.disabled = true;
 
             const formData = new FormData();
-            formData.append('textPdfFile', document.getElementById('inpTextFile').files[0]);
-            formData.append('visualPdfFile', document.getElementById('inpVisualFile').files[0]);
+            
+            // Add video link if provided
+            if (videoLink) {
+                formData.append('video_link', videoLink);
+            }
+            
+            // Add PDF files only if they exist (optional when video link is provided)
+            if (document.getElementById('inpTextFile').files[0]) {
+                formData.append('textPdfFile', document.getElementById('inpTextFile').files[0]);
+            }
+            if (document.getElementById('inpVisualFile').files[0]) {
+                formData.append('visualPdfFile', document.getElementById('inpVisualFile').files[0]);
+            }
             if (document.getElementById('inpStatementsFile').files[0]) {
                 formData.append('statementsPdfFile', document.getElementById('inpStatementsFile').files[0]);
             }
@@ -492,6 +674,7 @@
             try {
                 const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/chapters`, {
                     method: 'POST',
+                    credentials: 'include', // Include session cookie
                     body: formData
                 });
 
@@ -521,11 +704,14 @@
                 document.getElementById('inpTextFile').value = '';
                 document.getElementById('inpVisualFile').value = '';
                 document.getElementById('inpStatementsFile').value = '';
+                document.getElementById('inpVideoLink').value = '';
                 document.getElementById('inpChapterName').value = '';
                 document.getElementById('inpChapterDescription').value = '';
                 ['textFileName', 'visualFileName', 'statementsFileName'].forEach(id => {
                     document.getElementById(id).classList.add('hidden');
                 });
+                // Reset visual PDF visibility
+                document.getElementById('visualPdfContainer').classList.remove('hidden');
                 btn.disabled = true;
 
                 // Refresh chapters list and close modal after a delay
@@ -556,7 +742,9 @@
             empty.classList.add('hidden');
 
             try {
-                const response = await fetch(`${API_BASE}/api/courses`);
+                const response = await fetch(`${API_BASE}/api/courses`, {
+                    credentials: 'include' // Include session cookie
+                });
                 const courses = await response.json();
 
                 loading.classList.add('hidden');
@@ -627,7 +815,9 @@
         // View Course (show chapters)
         window.viewCourse = async function(courseId) {
             try {
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}`);
+                const response = await fetch(`${API_BASE}/api/courses/${courseId}`, {
+                    credentials: 'include' // Include session cookie
+                });
                 const course = await response.json();
                 showCourseDetails(course);
             } catch (error) {
@@ -647,7 +837,9 @@
             empty.classList.add('hidden');
 
             try {
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters`);
+                const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters`, {
+                    credentials: 'include' // Include session cookie
+                });
                 const chapters = await response.json();
 
                 loading.classList.add('hidden');
@@ -701,6 +893,17 @@
                         </p>
                     ` : ''}
                     
+                    ${chapter.videoLink ? `
+                        <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                            <p class="text-xs font-semibold text-purple-600 mb-1">
+                                <i class="fas fa-video mr-1"></i>Video Link
+                            </p>
+                            <a href="${escapeHtml(chapter.videoLink)}" target="_blank" class="text-sm text-purple-700 hover:underline break-all">
+                                ${escapeHtml(chapter.videoLink)}
+                            </a>
+                        </div>
+                    ` : ''}
+                    
                     <div class="flex flex-wrap gap-2 mt-4">
                         <button 
                             onclick="viewChapter('${currentCourseId}', '${chapter.id}', '${encodeURIComponent(chapter.chapterName)}')" 
@@ -739,7 +942,10 @@
         window.deleteCourse = async function(courseId) {
             if (!confirm('Delete this course and all its chapters?')) return;
             try {
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}`, { method: 'DELETE' });
+                const response = await fetch(`${API_BASE}/api/courses/${courseId}`, { 
+                    method: 'DELETE',
+                    credentials: 'include' // Include session cookie
+                });
                 if (response.ok) {
                     loadCourses();
                 } else {
@@ -755,7 +961,10 @@
         window.deleteChapter = async function(courseId, chapterId) {
             if (!confirm('Delete this chapter?')) return;
             try {
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}`, { method: 'DELETE' });
+                const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}`, { 
+                    method: 'DELETE',
+                    credentials: 'include' // Include session cookie
+                });
                 if (response.ok) {
                     loadChapters(courseId);
                 } else {
@@ -963,8 +1172,12 @@
             }
         });
 
-        // Initialize
-        loadCourses();
+        // Initialize - Check authentication first
+        checkAuthentication().then(authenticated => {
+            if (authenticated) {
+                loadCourses();
+            }
+        });
     </script>
 </body>
 </html>

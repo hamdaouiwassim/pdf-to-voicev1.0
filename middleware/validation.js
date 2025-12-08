@@ -269,52 +269,78 @@ function validatePythonLabRequest(req, res, next) {
  * statementsPdfFile is optional
  */
 function validateChapterUpload(req, res, next) {
-    if (!req.files || Object.keys(req.files).length === 0) {
+    const videoLink = typeof req.body?.video_link === 'string' ? req.body.video_link.trim() : null;
+    const hasVideoLink = videoLink && videoLink.length > 0;
+    
+    // If no video link, require files
+    if (!hasVideoLink && (!req.files || Object.keys(req.files).length === 0)) {
         return res.status(400).json({ error: constants.ERROR_MESSAGES.NO_FILE });
     }
 
-    // Both PDFs are required
+    // Validate video_link format if provided
+    if (hasVideoLink) {
+        try {
+            const url = new URL(videoLink);
+            // Allow http, https, and common video hosting URLs
+            if (!['http:', 'https:'].includes(url.protocol)) {
+                return res.status(400).json({ 
+                    error: 'video_link must be a valid HTTP or HTTPS URL' 
+                });
+            }
+        } catch (urlError) {
+            return res.status(400).json({ 
+                error: 'video_link must be a valid URL' 
+            });
+        }
+    }
+
+    // Text PDF is always required (for TTS)
     if (!req.files.textPdfFile) {
         return res.status(400).json({ 
-            error: 'Text PDF file is required. Use field name "textPdfFile" for the PDF containing the full text content (for TTS).' 
+            error: 'Text PDF file is required (for TTS). Use field name "textPdfFile" for the PDF containing the full text content for voice synthesis.' 
         });
     }
 
-    if (!req.files.visualPdfFile) {
+    // Visual PDF is required only when video_link is not provided
+    if (!hasVideoLink && !req.files.visualPdfFile) {
         return res.status(400).json({ 
-            error: 'Visual PDF file is required. Use field name "visualPdfFile" for the PDF to be displayed to users.' 
+            error: 'Visual PDF file is required when video_link is not provided. Use field name "visualPdfFile" for the PDF to be displayed to users.' 
         });
     }
 
-    const textFile = req.files.textPdfFile;
-    const visualFile = req.files.visualPdfFile;
+    const textFile = req.files?.textPdfFile;
+    const visualFile = req.files?.visualPdfFile;
     const statementsFile = req.files?.statementsPdfFile;
     const chapterName = typeof req.body?.chapterName === 'string' ? req.body.chapterName.trim() : '';
 
-    // Validate text PDF
-    if (!config.ALLOWED_MIME_TYPES.includes(textFile.mimetype)) {
-        return res.status(400).json({ error: 'Text PDF file must be application/pdf' });
-    }
-    if (textFile.size > config.MAX_FILE_SIZE) {
-        return res.status(400).json({ 
-            error: `Text PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
-        });
-    }
-    if (!textFile.name.toLowerCase().endsWith('.pdf')) {
-        return res.status(400).json({ error: 'Text PDF file must have .pdf extension' });
+    // Validate text PDF (only if provided)
+    if (textFile) {
+        if (!config.ALLOWED_MIME_TYPES.includes(textFile.mimetype)) {
+            return res.status(400).json({ error: 'Text PDF file must be application/pdf' });
+        }
+        if (textFile.size > config.MAX_FILE_SIZE) {
+            return res.status(400).json({ 
+                error: `Text PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
+            });
+        }
+        if (!textFile.name.toLowerCase().endsWith('.pdf')) {
+            return res.status(400).json({ error: 'Text PDF file must have .pdf extension' });
+        }
     }
 
-    // Validate visual PDF
-    if (!config.ALLOWED_MIME_TYPES.includes(visualFile.mimetype)) {
-        return res.status(400).json({ error: 'Visual PDF file must be application/pdf' });
-    }
-    if (visualFile.size > config.MAX_FILE_SIZE) {
-        return res.status(400).json({ 
-            error: `Visual PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
-        });
-    }
-    if (!visualFile.name.toLowerCase().endsWith('.pdf')) {
-        return res.status(400).json({ error: 'Visual PDF file must have .pdf extension' });
+    // Validate visual PDF (only if provided)
+    if (visualFile) {
+        if (!config.ALLOWED_MIME_TYPES.includes(visualFile.mimetype)) {
+            return res.status(400).json({ error: 'Visual PDF file must be application/pdf' });
+        }
+        if (visualFile.size > config.MAX_FILE_SIZE) {
+            return res.status(400).json({ 
+                error: `Visual PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
+            });
+        }
+        if (!visualFile.name.toLowerCase().endsWith('.pdf')) {
+            return res.status(400).json({ error: 'Visual PDF file must have .pdf extension' });
+        }
     }
 
     // Validate statements PDF (optional)

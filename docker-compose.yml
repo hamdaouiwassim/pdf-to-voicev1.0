@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: document-reader-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-titan_academy}
+      MYSQL_USER: ${DB_USER:-app_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-app_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - document-reader-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+
+  api:
+    build:
+      context: .
+      dockerfile: DockerFile
+    container_name: document-reader-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3002"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3002
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=${DB_USER:-app_user}
+      - DB_PASSWORD=${DB_PASSWORD:-app_password}
+      - DB_NAME=${DB_NAME:-titan_academy}
+      - DB_CONNECTION_LIMIT=${DB_CONNECTION_LIMIT:-10}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./audios:/app/audios
+      - ./temp:/app/temp
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - document-reader-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  document-reader-network:
+    driver: bridge
+

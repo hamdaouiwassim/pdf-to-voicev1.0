@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Titan Academy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mb-4">
+                    <i class="fas fa-graduation-cap text-white text-3xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Titan Academy</h1>
+                <p class="text-gray-600">Course & Chapter Management</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="inpEmail" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-envelope mr-2 text-indigo-500"></i>
+                        Email
+                    </label>
+                    <input
+                        type="email"
+                        id="inpEmail"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter your email"
+                        autocomplete="email"
+                        autofocus
+                    />
+                </div>
+
+                <div>
+                    <label for="inpPassword" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-key mr-2 text-indigo-500"></i>
+                        Password
+                    </label>
+                    <input
+                        type="password"
+                        id="inpPassword"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                    />
+                </div>
+
+                <button 
+                    type="button" 
+                    id="btnLogin" 
+                    class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                    <i class="fas fa-sign-in-alt mr-2"></i>
+                    Login
+                </button>
+
+                <div id="loginError" class="hidden mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                        <span id="loginErrorMessage" class="text-red-700 text-sm"></span>
+                    </div>
+                </div>
+
+                <div id="loginLoading" class="hidden mt-4 text-center">
+                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                    <p class="mt-2 text-sm text-gray-600">Logging in...</p>
+                </div>
+            </div>
+
+            <div class="mt-6 text-center text-sm text-gray-500">
+                <p><i class="fas fa-shield-alt mr-1"></i> Secure access to management panel</p>
+            </div>
+        </div>
+
+        <div class="mt-4 text-center text-sm text-gray-500">
+            <p>© 2025 Titan Academy. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Check if already authenticated
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/status`);
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    // Already logged in, redirect to index
+                    window.location.href = '/index.html';
+                }
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+            }
+        }
+
+        // Login function
+        async function login(email, password) {
+            const loading = document.getElementById('loginLoading');
+            const error = document.getElementById('loginError');
+            const btn = document.getElementById('btnLogin');
+
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include', // Important for session cookies
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.authenticated) {
+                    // Login successful, redirect to index
+                    window.location.href = '/index.html';
+                } else {
+                    // Login failed
+                    document.getElementById('loginErrorMessage').textContent = data.error || 'Invalid email or password';
+                    error.classList.remove('hidden');
+                    document.getElementById('inpPassword').value = '';
+                    document.getElementById('inpEmail').focus();
+                }
+            } catch (error) {
+                document.getElementById('loginErrorMessage').textContent = 'Connection error. Please try again.';
+                error.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+                btn.disabled = false;
+            }
+        }
+
+        // Event listeners
+        document.getElementById('btnLogin').addEventListener('click', () => {
+            const email = document.getElementById('inpEmail').value.trim();
+            const password = document.getElementById('inpPassword').value;
+
+            if (!email) {
+                document.getElementById('loginErrorMessage').textContent = 'Please enter your email';
+                document.getElementById('loginError').classList.remove('hidden');
+                document.getElementById('inpEmail').focus();
+                return;
+            }
+
+            if (!password) {
+                document.getElementById('loginErrorMessage').textContent = 'Please enter your password';
+                document.getElementById('loginError').classList.remove('hidden');
+                document.getElementById('inpPassword').focus();
+                return;
+            }
+
+            login(email, password);
+        });
+
+        // Allow Enter key to submit login
+        document.getElementById('inpEmail').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('inpPassword').focus();
+            }
+        });
+
+        document.getElementById('inpPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('btnLogin').click();
+            }
+        });
+
+        // Check auth status on load
+        checkAuthStatus();
+    </script>
+</body>
+</html>
+

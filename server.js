@@ -1,9 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
+const session = require('express-session');
+const path = require('path');
 const config = require('./config/config');
 const fileUtils = require('./utils/fileUtils');
 const errorHandler = require('./middleware/errorHandler');
+const db = require('./config/database');
+const { requireAuth } = require('./middleware/auth');
 
 // Import controllers (for backward compatibility)
 const documentController = require('./controllers/documentController');
@@ -16,6 +20,7 @@ const audioRoutes = require('./routes/audioRoutes');
 const labRoutes = require('./routes/labRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const chapterRoutes = require('./routes/chapterRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // Initialize Express app
 const app = express();
@@ -27,10 +32,30 @@ app.use(cors({
     origin: '*', // Allow all origins (can be restricted in production)
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false
+    credentials: true // Enable credentials for session cookies
+}));
+
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'titan-academy-secret-key-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: false, // Set to true in production with HTTPS
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    },
+    name: 'titan.academy.sid' // Custom session cookie name
 }));
 
 app.use(express.json());
+
+// Protect index.html - redirect to login if not authenticated
+app.get('/index.html', requireAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve static files (login.html is public, index.html is protected above)
 app.use(express.static('public'));
 
 // Middleware to set inline Content-Disposition for PDF files (prevents download prompt on Android)
@@ -59,15 +84,19 @@ app.use('/audios', (req, res, next) => {
 app.use(fileUpload());
 
 // --- API Routes ---
+// Authentication routes (public)
+app.use('/api/auth', authRoutes);
+
 // Maintain backward compatibility for /api/extract-text
 app.use('/api/documents', documentRoutes);
 app.use('/api/tts', ttsRoutes);
 app.use('/api/qa', qaRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/lab', labRoutes);
-// Course and Chapter routes
-app.use('/api/courses', courseRoutes);
-app.use('/api/courses/:courseId/chapters', chapterRoutes);
+
+// Course and Chapter routes (protected)
+app.use('/api/courses', requireAuth, courseRoutes);
+app.use('/api/courses/:courseId/chapters', requireAuth, chapterRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -84,7 +113,16 @@ app.use(errorHandler);
 // --- Start Server ---
 fileUtils.setupDirectories(); // Ensure directories exist before starting
 
-app.listen(config.PORT, () => {
+// Initialize database connection
+async function startServer() {
+    // Test database connection (optional - won't fail if DB is not configured)
+    if (config.DB_HOST && config.DB_NAME) {
+        await db.testConnection();
+    } else {
+        console.log('⚠ MySQL database not configured (DB_HOST/DB_NAME not set)');
+    }
+
+    app.listen(config.PORT, () => {
     try {
         console.log(`Server is running at http://localhost:${config.PORT}`);
         const keyDisplay = config.GEMINI_API_KEY ? `${config.GEMINI_API_KEY.substring(0, 4)}...` : 'NOT SET';
@@ -108,4 +146,24 @@ app.listen(config.PORT, () => {
     } catch (error) {
         console.error("Server startup error:", error);
     }
+    });
+}
+
+// Start the server
+startServer().catch(error => {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('\nShutting down gracefully...');
+    await db.closePool();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('\nShutting down gracefully...');
+    await db.closePool();
+    process.exit(0);
 });

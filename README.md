@@ -139,6 +139,46 @@ Audio Directory: /path/to/audios
 NOTE: Open index.html in your browser.
 ```
 
+## 🐳 Docker Setup (Alternative Installation)
+
+You can also run the API and MySQL database using Docker Compose. This is the easiest way to get started with the database.
+
+**Note:** The `docker-compose.yml` file is located in the **project root directory**, not in the `api/` folder.
+
+### Quick Start with Docker
+
+1. **Navigate to the API directory:**
+   ```bash
+   cd document-reader/api
+   ```
+
+2. **Create/Update your `.env` file** in the root directory with MySQL configuration:
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   DB_ROOT_PASSWORD=rootpassword
+   DB_NAME=titan_academy
+   DB_USER=app_user
+   DB_PASSWORD=app_password
+   DB_PORT=3306
+   PORT=3000
+   ```
+
+3. **Start services:**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Check logs:**
+   ```bash
+   docker-compose logs -f
+   ```
+
+The API will be available at `http://localhost:3000` and MySQL at `localhost:3306`.
+
+**Important:** Run all `docker-compose` commands from the **project root directory** (where `docker-compose.yml` is located).
+
+For detailed Docker setup instructions, see [DOCKER_SETUP.md](./DOCKER_SETUP.md).
+
 ## 📁 Project Structure
 
 ```

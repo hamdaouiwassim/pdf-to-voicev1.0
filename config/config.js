@@ -9,6 +9,14 @@ const config = {
     // Server Configuration
     PORT: process.env.PORT || 3000,
     
+    // Database Configuration
+    DB_HOST: process.env.DB_HOST || 'localhost',
+    DB_PORT: process.env.DB_PORT || 3306,
+    DB_USER: process.env.DB_USER || 'root',
+    DB_PASSWORD: process.env.DB_PASSWORD || '',
+    DB_NAME: process.env.DB_NAME || 'titan_academy',
+    DB_CONNECTION_LIMIT: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
+    
     // API Configuration
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_FLASH_MODEL: 'gemini-2.5-flash-preview-09-2025',

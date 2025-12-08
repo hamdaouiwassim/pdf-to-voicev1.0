@@ -1,0 +1,58 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Docker files
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Temporary files
+temp
+tmp
+
+# Uploads and audios (will be mounted as volumes)
+uploads/*
+!uploads/.gitkeep
+audios/*
+!audios/.gitkeep
+
+# Test files
+test
+tests
+*.test.js
+*.spec.js
+
+# Coverage
+coverage
+.nyc_output
+

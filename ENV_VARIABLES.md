@@ -22,6 +22,23 @@ GEMINI_API_KEY=your_gemini_api_key_here
 PORT=3000
 
 # ===========================================
+# OPTIONAL - Authentication Configuration
+# ===========================================
+ADMIN_EMAIL=admin@titanacademy.com
+ADMIN_PASSWORD=admin123
+SESSION_SECRET=titan-academy-secret-key-change-in-production
+
+# ===========================================
+# OPTIONAL - MySQL Database Configuration
+# ===========================================
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+DB_NAME=titan_academy
+DB_CONNECTION_LIMIT=10
+
+# ===========================================
 # OPTIONAL - Free AI Alternatives (Recommended)
 # ===========================================
 GROQ_API_KEY=your_groq_api_key_here
@@ -88,6 +105,64 @@ GEMINI_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - **Default:** `3000`
 - **Description:** Port number for the Express server
 - **Example:** `PORT=3000`
+
+---
+
+### Authentication Configuration
+
+#### `ADMIN_EMAIL`
+- **Default:** `admin@titanacademy.com`
+- **Description:** Email address for accessing the course and chapter management interface
+- **Example:** `ADMIN_EMAIL=admin@yourdomain.com`
+- **Security Note:** Change this to your admin email in production
+
+#### `ADMIN_PASSWORD`
+- **Default:** `admin123`
+- **Description:** Password for accessing the course and chapter management interface
+- **Example:** `ADMIN_PASSWORD=your_secure_password_here`
+- **Security Note:** Change this to a strong password in production
+
+#### `SESSION_SECRET`
+- **Default:** `titan-academy-secret-key-change-in-production`
+- **Description:** Secret key used to sign session cookies. Should be a random, secure string
+- **Example:** `SESSION_SECRET=your-random-secret-key-here`
+- **Security Note:** Use a strong, random secret in production. Generate with: `openssl rand -base64 32`
+
+---
+
+### MySQL Database Configuration
+
+#### `DB_HOST`
+- **Default:** `localhost`
+- **Description:** MySQL database host address
+- **Example:** `DB_HOST=localhost` or `DB_HOST=127.0.0.1`
+
+#### `DB_PORT`
+- **Default:** `3306`
+- **Description:** MySQL database port number
+- **Example:** `DB_PORT=3306`
+
+#### `DB_USER`
+- **Default:** `root`
+- **Description:** MySQL database username
+- **Example:** `DB_USER=root`
+
+#### `DB_PASSWORD`
+- **Default:** `` (empty string)
+- **Description:** MySQL database password
+- **Example:** `DB_PASSWORD=your_password_here`
+
+#### `DB_NAME`
+- **Default:** `titan_academy`
+- **Description:** MySQL database name
+- **Example:** `DB_NAME=titan_academy`
+
+#### `DB_CONNECTION_LIMIT`
+- **Default:** `10`
+- **Description:** Maximum number of connections in the connection pool
+- **Example:** `DB_CONNECTION_LIMIT=10`
+
+**Note:** The database connection is optional. If `DB_HOST` or `DB_NAME` are not set, the application will start without database functionality.
 
 ---
 
@@ -212,6 +287,19 @@ GEMINI_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Server
 PORT=3000
 
+# Authentication (Optional)
+ADMIN_EMAIL=admin@titanacademy.com
+ADMIN_PASSWORD=admin123
+SESSION_SECRET=titan-academy-secret-key-change-in-production
+
+# MySQL Database (Optional)
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+DB_NAME=titan_academy
+DB_CONNECTION_LIMIT=10
+
 # Free AI (Recommended)
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 GROQ_MODEL=llama-3.1-8b-instant
@@ -284,6 +372,15 @@ USE_FREE_AI=true
 |----------|----------|---------|-------------|
 | `GEMINI_API_KEY` | ✅ Yes | - | Google Gemini API key |
 | `PORT` | No | `3000` | Server port |
+| `ADMIN_EMAIL` | No | `admin@titanacademy.com` | Admin email for login |
+| `ADMIN_PASSWORD` | No | `admin123` | Admin password for login |
+| `SESSION_SECRET` | No | `titan-academy-secret-key...` | Session cookie secret |
+| `DB_HOST` | No | `localhost` | MySQL host |
+| `DB_PORT` | No | `3306` | MySQL port |
+| `DB_USER` | No | `root` | MySQL username |
+| `DB_PASSWORD` | No | `` | MySQL password |
+| `DB_NAME` | No | `titan_academy` | MySQL database name |
+| `DB_CONNECTION_LIMIT` | No | `10` | Connection pool limit |
 | `GROQ_API_KEY` | No* | - | Groq API key (recommended) |
 | `GROQ_MODEL` | No | `llama-3.1-8b-instant` | Groq model |
 | `HUGGINGFACE_API_KEY` | No* | - | Hugging Face API key |
