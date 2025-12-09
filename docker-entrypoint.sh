@@ -51,17 +51,42 @@ wait_for_mysql || {
 
 # Run users table creation script
 echo "📋 Creating users table..."
-npm run create-table || {
-    echo "⚠️ Warning: Users table creation had issues (table may already exist)"
-}
+node scripts/createUsersTable.js
+EXIT_CODE=$?
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✓ Users table script completed successfully (exit code: $EXIT_CODE)"
+elif [ $EXIT_CODE -eq 1 ]; then
+    echo "⚠️ Warning: Users table creation had an error (exit code: $EXIT_CODE)"
+else
+    echo "⚠️ Warning: Users table creation exited with code $EXIT_CODE"
+fi
+echo "📋 Continuing after users table script..."
 
 # Run database table creation script
 echo "📊 Creating database tables..."
-npm run create-db-tables || true
+node scripts/createDatabaseTables.js
+EXIT_CODE=$?
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✓ Database tables script completed successfully (exit code: $EXIT_CODE)"
+elif [ $EXIT_CODE -eq 1 ]; then
+    echo "⚠️ Warning: Database tables creation had an error (exit code: $EXIT_CODE)"
+else
+    echo "⚠️ Warning: Database tables creation exited with code $EXIT_CODE"
+fi
+echo "📊 Continuing after database tables script..."
 
 # Run admin user creation script
 echo "👤 Creating admin user..."
-npm run create-admin || true
+node scripts/createAdminUser.js
+EXIT_CODE=$?
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✓ Admin user script completed successfully (exit code: $EXIT_CODE)"
+elif [ $EXIT_CODE -eq 1 ]; then
+    echo "⚠️ Warning: Admin user creation had an error (exit code: $EXIT_CODE)"
+else
+    echo "⚠️ Warning: Admin user creation exited with code $EXIT_CODE"
+fi
+echo "👤 Continuing after admin user script..."
 
 echo "✅ Initialization complete!"
 echo "🌐 Starting API server..."
