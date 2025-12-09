@@ -173,42 +173,80 @@ fileUtils.setupDirectories(); // Ensure directories exist before starting
 async function startServer() {
     // Test database connection (optional - won't fail if DB is not configured)
     if (config.DB_HOST && config.DB_NAME) {
-        await db.testConnection();
+        try {
+            const connected = await db.testConnection();
+            if (!connected) {
+                console.warn('⚠ Database connection test failed, but continuing server startup...');
+            }
+        } catch (error) {
+            console.warn('⚠ Database connection test error, but continuing server startup:', error.message);
+        }
     } else {
         console.log('⚠ MySQL database not configured (DB_HOST/DB_NAME not set)');
     }
 
-    app.listen(config.PORT, () => {
+    // Start the server regardless of database connection status
     try {
-        console.log(`Server is running at http://localhost:${config.PORT}`);
-        const keyDisplay = config.GEMINI_API_KEY ? `${config.GEMINI_API_KEY.substring(0, 4)}...` : 'NOT SET';
-        console.log(`API Key: ${keyDisplay} (Set via .env file or GEMINI_API_KEY)`);
-        console.log(`Uploads Directory: ${config.UPLOADS_DIR}`);
-        console.log(`Audio Directory: ${config.AUDIOS_DIR}`);
-        console.log(`Platform: ${process.platform}`);
-        
-        // Check if Poppler utilities are available (for PDF to WebP conversion)
-        const { execSync } = require('child_process');
-        try {
-            execSync('pdftocairo -v', { stdio: 'ignore' });
-            console.log('✓ Poppler utilities are available');
-        } catch (error) {
-            console.warn('⚠ Poppler utilities not found - PDF to WebP conversion may fail');
-            console.warn('  Install with: apt-get install poppler-utils (Debian/Ubuntu)');
-        }
-        
-        console.log("-----------------------------------------");
-        console.log("NOTE: Open index.html in your browser.");
+        const server = app.listen(config.PORT, '0.0.0.0', () => {
+            try {
+                console.log(`✓ Server is running at http://0.0.0.0:${config.PORT}`);
+                console.log(`✓ Server is accessible at http://localhost:${config.PORT}`);
+                const keyDisplay = config.GEMINI_API_KEY ? `${config.GEMINI_API_KEY.substring(0, 4)}...` : 'NOT SET';
+                console.log(`API Key: ${keyDisplay} (Set via .env file or GEMINI_API_KEY)`);
+                console.log(`Uploads Directory: ${config.UPLOADS_DIR}`);
+                console.log(`Audio Directory: ${config.AUDIOS_DIR}`);
+                console.log(`Platform: ${process.platform}`);
+                
+                // Check if Poppler utilities are available (for PDF to WebP conversion)
+                const { execSync } = require('child_process');
+                try {
+                    execSync('pdftocairo -v', { stdio: 'ignore' });
+                    console.log('✓ Poppler utilities are available');
+                } catch (error) {
+                    console.warn('⚠ Poppler utilities not found - PDF to WebP conversion may fail');
+                    console.warn('  Install with: apt-get install poppler-utils (Debian/Ubuntu)');
+                }
+                
+                console.log("-----------------------------------------");
+                console.log("NOTE: Open index.html in your browser.");
+            } catch (error) {
+                console.error("Server startup error:", error);
+            }
+        });
+
+        // Handle server errors
+        server.on('error', (error) => {
+            if (error.code === 'EADDRINUSE') {
+                console.error(`❌ Port ${config.PORT} is already in use. Please use a different port.`);
+            } else {
+                console.error('❌ Server error:', error);
+            }
+            process.exit(1);
+        });
     } catch (error) {
-        console.error("Server startup error:", error);
+        console.error('❌ Failed to start server:', error);
+        throw error;
     }
-    });
 }
 
 // Start the server
 startServer().catch(error => {
     console.error("Failed to start server:", error);
+    console.error("Error stack:", error.stack);
     process.exit(1);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    console.error('Error stack:', error.stack);
+    // Don't exit immediately, let the server try to start
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit immediately, let the server try to start
 });
 
 // Graceful shutdown
