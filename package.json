@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "npm run create-table && npm run create-db-tables && npm run create-admin && node server.js",
     "create-table": "node scripts/createUsersTable.js",
     "create-db-tables": "node scripts/createDatabaseTables.js",
     "create-admin": "node scripts/createAdminUser.js",

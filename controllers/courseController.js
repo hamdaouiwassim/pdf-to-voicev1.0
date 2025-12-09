@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const dbUtils = require('../utils/dbUtils');
+const subscriptionUtils = require('../utils/subscriptionUtils');
 
 /**
  * Create a new course
@@ -50,7 +51,56 @@ async function createCourse(req, res) {
  */
 async function getAllCourses(req, res) {
     try {
+        const userId = req.session.userId;
+        const userRole = req.session.role;
+        
         const courses = await dbUtils.getAllCourses();
+        
+        // If user is not admin, add enrollment and subscription info
+        if (userRole !== 'admin' && userId) {
+            const enrolledCourses = await subscriptionUtils.getUserEnrolledCourses(userId);
+            // Filter out any undefined/null enrollments and safely extract courseId
+            const enrolledCourseIds = new Set(
+                enrolledCourses
+                    .filter(c => c && c.courseId)
+                    .map(c => c.courseId)
+            );
+
+            // Compute once per request to avoid repeated queries
+            const userHasActiveSubscription = await subscriptionUtils.hasActiveSubscription(userId);
+            
+            const coursesWithEnrollment = await Promise.all(courses.map(async (course) => {
+                if (!course || !course.id) {
+                    return course; // Skip invalid courses
+                }
+                
+                const isEnrolledFromDb = enrolledCourseIds.has(course.id);
+                let subscriptions = [];
+                try {
+                    subscriptions = await subscriptionUtils.getSubscriptionsForCourse(course.id);
+                } catch (subError) {
+                    console.error(`[Course Controller] Error getting subscriptions for course ${course.id}:`, subError);
+                    subscriptions = [];
+                }
+                
+                const activeSubsForCourse = subscriptions.filter(s => s && s.isActive);
+
+                // If user has an active subscription that includes this course but isn't enrolled yet,
+                // mark as enrolled so the UI can start the course (middleware will auto-enroll on access).
+                const isEnrolled = isEnrolledFromDb || (userHasActiveSubscription && activeSubsForCourse.length > 0);
+                
+                return {
+                    ...course,
+                    isEnrolled,
+                    canEnroll: false, // enrollment handled by admin/subscription; no self-enroll on frontend
+                    subscriptions: activeSubsForCourse,
+                    userHasActiveSubscription: userHasActiveSubscription
+                };
+            }));
+            
+            return res.json(coursesWithEnrollment);
+        }
+        
         res.json(courses);
     } catch (error) {
         console.error("[Courses List Error]:", error);

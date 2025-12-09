@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const db = require('../config/database');
+const subscriptionUtils = require('../utils/subscriptionUtils');
 
 /**
  * Validate email format
@@ -29,19 +30,29 @@ async function getAllUsers(req, res) {
              ORDER BY created_at DESC`
         );
 
-        // Don't return passwords
-        const sanitizedUsers = users.map(user => ({
-            id: user.id,
-            email: user.email,
-            name: user.name || null,
-            role: user.role,
-            isActive: user.is_active,
-            createdAt: user.created_at,
-            updatedAt: user.updated_at,
-            lastLogin: user.last_login
+        // Get subscription info for each user
+        const usersWithSubscriptions = await Promise.all(users.map(async (user) => {
+            const subscription = await subscriptionUtils.getUserActiveSubscription(user.id);
+            return {
+                id: user.id,
+                email: user.email,
+                name: user.name || null,
+                role: user.role,
+                isActive: user.is_active,
+                createdAt: user.created_at,
+                updatedAt: user.updated_at,
+                lastLogin: user.last_login,
+                subscription: subscription ? {
+                    id: subscription.id,
+                    subscriptionId: subscription.subscriptionId,
+                    subscriptionName: subscription.subscriptionName,
+                    endDate: subscription.endDate,
+                    isActive: subscription.isActive
+                } : null
+            };
         }));
 
-        res.json(sanitizedUsers);
+        res.json(usersWithSubscriptions);
     } catch (error) {
         console.error("[Users List Error]:", error);
         res.status(500).json({

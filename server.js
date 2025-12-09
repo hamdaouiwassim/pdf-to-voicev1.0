@@ -22,6 +22,7 @@ const courseRoutes = require('./routes/courseRoutes');
 const chapterRoutes = require('./routes/chapterRoutes');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 // Initialize Express app
 const app = express();
@@ -63,7 +64,8 @@ app.use(session({
     cookie: {
         secure: false, // Set to true in production with HTTPS
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        sameSite: 'lax' // Allow cross-site requests with credentials
     },
     name: 'titan.academy.sid' // Custom session cookie name
 }));
@@ -127,9 +129,27 @@ app.use('/api/qa', qaRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/lab', labRoutes);
 
-// Course and Chapter routes (protected)
-app.use('/api/courses', requireAuth, courseRoutes);
-app.use('/api/courses/:courseId/chapters', requireAuth, chapterRoutes);
+// Subscription routes (protected)
+app.use('/api/subscriptions', requireAuth, subscriptionRoutes);
+
+// Course routes (protected - require subscription)
+const { requireSubscription } = require('./middleware/subscription');
+const subscriptionController = require('./controllers/subscriptionController');
+
+// Course enrollment routes (before requireSubscription middleware)
+app.post('/api/courses/:courseId/enroll', requireAuth, subscriptionController.enrollInCourse);
+app.get('/api/courses/:courseId/subscriptions', requireAuth, subscriptionController.getSubscriptionsForCourse);
+app.get('/api/users/me/courses', requireAuth, subscriptionController.getUserEnrolledCourses);
+
+// Admin: Enroll user in course (bypasses subscription requirement)
+app.post('/api/users/:userId/enroll/:courseId', requireAuth, subscriptionController.adminEnrollUserInCourse);
+
+// Admin: Cancel user enrollment in course
+app.delete('/api/users/:userId/enroll/:courseId', requireAuth, subscriptionController.cancelUserEnrollment);
+
+// Course and Chapter routes (protected - require subscription and enrollment)
+app.use('/api/courses', requireAuth, requireSubscription, courseRoutes);
+app.use('/api/courses/:courseId/chapters', requireAuth, requireSubscription, chapterRoutes);
 
 // User management routes (protected)
 app.use('/api/users', requireAuth, userRoutes);

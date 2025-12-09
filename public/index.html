@@ -43,6 +43,10 @@
                             <i class="fas fa-users"></i>
                             Users
                         </a>
+                        <a href="/subscriptions.html" class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-credit-card"></i>
+                            Subscriptions
+                        </a>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
@@ -73,6 +77,10 @@
                             <a href="/users.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <i class="fas fa-users w-4"></i>
                                 Manage Users
+                            </a>
+                            <a href="/users.html#subscriptions" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <i class="fas fa-credit-card w-4"></i>
+                                Manage Subscriptions
                             </a>
                             <div class="border-t border-gray-200 my-1"></div>
                             <button 
@@ -183,7 +191,7 @@
         <div id="createCourseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                    <h3 class="text-2xl font-semibold text-gray-800">Create New Course</h3>
+                    <h3 id="createCourseModalTitle" class="text-2xl font-semibold text-gray-800">Create New Course</h3>
                     <button id="closeCreateCourseModal" class="text-gray-400 hover:text-gray-600 text-2xl">
                         <i class="fas fa-times"></i>
                     </button>
@@ -220,7 +228,7 @@
                             class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <i class="fas fa-plus mr-2"></i>
-                            Create Course
+                            <span id="btnCreateCourseText">Create Course</span>
                         </button>
                         <div id="courseCreateResult" class="hidden mt-4"></div>
                     </div>
@@ -389,6 +397,7 @@
         let currentChapterId = null;
         let currentCourse = null;
         let isAuthenticated = false;
+        let currentEditingCourseId = null;
 
         // Authentication Functions
         async function checkAuthentication() {
@@ -425,19 +434,37 @@
             const userName = authData.name || userEmail.split('@')[0];
             
             // Set user email in navbar
-            document.getElementById('userEmailNav').textContent = userEmail;
+            const userEmailNav = document.getElementById('userEmailNav');
+            if (userEmailNav) {
+                userEmailNav.textContent = userEmail;
+            }
             
             // Set user initials
             const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || userEmail[0].toUpperCase();
-            document.getElementById('userInitials').textContent = initials;
+            const userInitials = document.getElementById('userInitials');
+            if (userInitials) {
+                userInitials.textContent = initials;
+            }
             
             // Set dropdown info
-            document.getElementById('dropdownUserName').textContent = userName;
-            document.getElementById('dropdownUserEmail').textContent = userEmail;
+            const dropdownUserName = document.getElementById('dropdownUserName');
+            const dropdownUserEmail = document.getElementById('dropdownUserEmail');
+            if (dropdownUserName) {
+                dropdownUserName.textContent = userName;
+            }
+            if (dropdownUserEmail) {
+                dropdownUserEmail.textContent = userEmail;
+            }
             
             // Show management features
-            document.getElementById('btnAddCourse').style.display = 'block';
-            document.getElementById('btnAddChapter').style.display = 'block';
+            const btnAddCourse = document.getElementById('btnAddCourse');
+            const btnAddChapter = document.getElementById('btnAddChapter');
+            if (btnAddCourse) {
+                btnAddCourse.style.display = 'block';
+            }
+            if (btnAddChapter) {
+                btnAddChapter.style.display = 'block';
+            }
         }
 
         // User Dropdown Toggle
@@ -502,12 +529,45 @@
 
         // Add Course button
         document.getElementById('btnAddCourse').addEventListener('click', () => {
+            currentEditingCourseId = null;
+            document.getElementById('createCourseModalTitle').textContent = 'Create New Course';
+            document.getElementById('btnCreateCourseText').textContent = 'Create Course';
+            document.getElementById('inpCourseName').value = '';
+            document.getElementById('inpCourseDescription').value = '';
+            document.getElementById('courseCreateResult').classList.add('hidden');
             document.getElementById('createCourseModal').classList.remove('hidden');
         });
+
+        // Edit Course
+        window.editCourse = async function(courseId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/courses/${courseId}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load course');
+                }
+
+                const course = await response.json();
+                currentEditingCourseId = courseId;
+
+                document.getElementById('createCourseModalTitle').textContent = 'Edit Course';
+                document.getElementById('btnCreateCourseText').textContent = 'Update Course';
+                document.getElementById('inpCourseName').value = course.courseName || '';
+                document.getElementById('inpCourseDescription').value = course.courseDescription || '';
+                document.getElementById('courseCreateResult').classList.add('hidden');
+
+                document.getElementById('createCourseModal').classList.remove('hidden');
+            } catch (error) {
+                alert('Error loading course: ' + error.message);
+            }
+        };
 
         // Close Create Course Modal
         document.getElementById('closeCreateCourseModal').addEventListener('click', () => {
             document.getElementById('createCourseModal').classList.add('hidden');
+            currentEditingCourseId = null;
         });
 
         // Add Chapter button
@@ -558,39 +618,56 @@
             resultDiv.classList.add('hidden');
 
             try {
-                const response = await fetch(`${API_BASE}/api/courses`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include', // Include session cookie
-                    body: JSON.stringify({ courseName, courseDescription })
-                });
+                let response;
+                if (currentEditingCourseId) {
+                    // Update existing course
+                    response = await fetch(`${API_BASE}/api/courses/${currentEditingCourseId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ courseName, courseDescription })
+                    });
+                } else {
+                    // Create new course
+                    response = await fetch(`${API_BASE}/api/courses`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ courseName, courseDescription })
+                    });
+                }
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Failed to create course');
+                    throw new Error(data.error || `Failed to ${currentEditingCourseId ? 'update' : 'create'} course`);
                 }
 
                 resultDiv.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
                 resultDiv.innerHTML = `
                     <div class="flex items-center">
                         <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                        <span class="text-green-700 font-medium">Course created successfully!</span>
+                        <span class="text-green-700 font-medium">Course ${currentEditingCourseId ? 'updated' : 'created'} successfully!</span>
                     </div>
+                    ${!currentEditingCourseId ? `
                     <div class="mt-2 text-sm text-gray-600">
                         <strong>Course ID:</strong> ${data.courseId}<br>
                         <strong>Name:</strong> ${escapeHtml(data.courseName)}
                     </div>
+                    ` : ''}
                 `;
                 resultDiv.classList.remove('hidden');
 
-                // Clear form
-                document.getElementById('inpCourseName').value = '';
-                document.getElementById('inpCourseDescription').value = '';
+                // Clear form only if creating new course
+                if (!currentEditingCourseId) {
+                    document.getElementById('inpCourseName').value = '';
+                    document.getElementById('inpCourseDescription').value = '';
+                }
 
                 // Refresh courses list and close modal after a delay
                 setTimeout(() => {
                     document.getElementById('createCourseModal').classList.add('hidden');
+                    currentEditingCourseId = null;
                     loadCourses();
                 }, 2000);
             } catch (error) {
@@ -861,13 +938,22 @@
                                 ${course.chaptersCount || 0} chapter${course.chaptersCount !== 1 ? 's' : ''}
                             </p>
                         </div>
-                        <button
-                            onclick="event.stopPropagation(); deleteCourse('${course.id}')"
-                            class="text-red-500 hover:text-red-600 text-sm font-semibold flex items-center gap-1"
-                            title="Delete course"
-                        >
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button
+                                onclick="event.stopPropagation(); editCourse('${course.id}')"
+                                class="text-indigo-500 hover:text-indigo-600 text-sm font-semibold flex items-center gap-1"
+                                title="Edit course"
+                            >
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button
+                                onclick="event.stopPropagation(); deleteCourse('${course.id}')"
+                                class="text-red-500 hover:text-red-600 text-sm font-semibold flex items-center gap-1"
+                                title="Delete course"
+                            >
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <p class="text-sm text-gray-600 mb-4 line-clamp-3">
@@ -1232,6 +1318,7 @@
         document.getElementById('createCourseModal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('createCourseModal')) {
                 document.getElementById('createCourseModal').classList.add('hidden');
+                currentEditingCourseId = null;
             }
         });
 

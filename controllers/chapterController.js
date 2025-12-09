@@ -171,34 +171,40 @@ async function createChapter(req, res) {
         let statementsPdfFilename = null;
         let webpImages = [];
 
-        // Process PDFs only if video_link is not provided
+        // Always process text PDF (needed for TTS and summary, even with video)
+        if (textPdfFile) {
+            const textPdfBuffer = textPdfFile.data;
+            textPdfFilename = `${chapterId}_text${constants.FILE_EXTENSIONS.PDF}`;
+            const textPdfPath = path.join(chapterDir, textPdfFilename);
+            
+            // Parse and save text PDF
+            textResult = await pdfParse(textPdfBuffer);
+            await fsPromises.writeFile(textPdfPath, textPdfBuffer);
+        }
+
+        // Process visual PDF and statements only if video_link is not provided
         if (!hasVideoLink) {
-            if (!textPdfFile || !visualPdfFile) {
+            if (!visualPdfFile) {
                 return res.status(400).json({ 
-                    error: 'PDF files are required when video_link is not provided' 
+                    error: 'Visual PDF file is required when video_link is not provided' 
                 });
             }
 
-            const textPdfBuffer = textPdfFile.data;
             const visualPdfBuffer = visualPdfFile.data;
 
             // File paths
-            textPdfFilename = `${chapterId}_text${constants.FILE_EXTENSIONS.PDF}`;
             visualPdfFilename = `${chapterId}_visual${constants.FILE_EXTENSIONS.PDF}`;
             statementsPdfFilename = statementsPdfFile ? `${chapterId}_statements${constants.FILE_EXTENSIONS.PDF}` : null;
             
-            const textPdfPath = path.join(chapterDir, textPdfFilename);
             const visualPdfPath = path.join(chapterDir, visualPdfFilename);
             const statementsPdfPath = statementsPdfFilename ? path.join(chapterDir, statementsPdfFilename) : null;
 
             // WebP output directory
             const webpDir = path.join(chapterDir, 'webp');
 
-            // Parse PDFs and save files
-            const textParsePromise = pdfParse(textPdfBuffer);
+            // Parse visual PDF
             const visualParsePromise = pdfParse(visualPdfBuffer);
             const writePromises = [
-                fsPromises.writeFile(textPdfPath, textPdfBuffer),
                 fsPromises.writeFile(visualPdfPath, visualPdfBuffer)
             ];
 
@@ -208,7 +214,7 @@ async function createChapter(req, res) {
                 writePromises.push(fsPromises.writeFile(statementsPdfPath, statementsPdfFile.data));
             }
 
-            const parsePromises = [textParsePromise, visualParsePromise];
+            const parsePromises = [visualParsePromise];
             if (statementsParsePromise) {
                 parsePromises.push(statementsParsePromise);
             }
@@ -216,9 +222,8 @@ async function createChapter(req, res) {
             const parseResults = await Promise.all(parsePromises);
             await Promise.all(writePromises);
 
-            textResult = parseResults[0];
-            visualResult = parseResults[1];
-            statementsResult = statementsParsePromise ? parseResults[2] : null;
+            visualResult = parseResults[0];
+            statementsResult = statementsParsePromise ? parseResults[1] : null;
 
             // Extract statements if provided
             if (statementsPdfFile) {
@@ -487,11 +492,9 @@ async function summarizeChapter(req, res) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
 
-        // If chapter has video_link but no text content, return error
-        if (chapter.videoLink && !chapter.textContent) {
-            return res.status(400).json({ 
-                error: 'Summary is not available for chapters with video links only. This chapter uses a video_link and does not have text content for summarization.' 
-            });
+        // Allow video chapters to use their text PDF for summary/TTS; only block if no text content at all
+        if (!chapter.textContent) {
+            return res.status(404).json({ error: 'Chapter content not found' });
         }
 
         const summaryAudioId = `${chapterId}${constants.AUDIO_PREFIXES.SUMMARY}`;
@@ -815,10 +818,25 @@ async function getChapterStatements(req, res) {
 async function deleteChapter(req, res) {
     try {
         const { courseId, chapterId } = req.params;
-        const deleted = await fileUtils.deleteChapterAssets(courseId, chapterId);
-
-        if (!deleted) {
+        
+        // First check if chapter exists in database
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
+        if (!chapter) {
             return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        // Delete from database first
+        const dbDeleted = await dbUtils.deleteChapter(courseId, chapterId);
+        if (!dbDeleted) {
+            return res.status(404).json({ error: 'Chapter not found in database' });
+        }
+
+        // Then delete file assets (this may fail if files don't exist, but that's okay)
+        try {
+            await fileUtils.deleteChapterAssets(courseId, chapterId);
+        } catch (fileError) {
+            // Log but don't fail - database record is already deleted
+            console.warn("[Chapter Delete] Warning: Failed to delete some file assets:", fileError.message);
         }
 
         res.json({
