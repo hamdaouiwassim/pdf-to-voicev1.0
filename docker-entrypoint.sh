@@ -57,15 +57,11 @@ npm run create-table || {
 
 # Run database table creation script
 echo "📊 Creating database tables..."
-npm run create-db-tables || {
-    echo "⚠️ Warning: Database tables creation had issues (tables may already exist)"
-}
+npm run create-db-tables || true
 
 # Run admin user creation script
 echo "👤 Creating admin user..."
-npm run create-admin || {
-    echo "⚠️ Warning: Admin user creation had issues (user may already exist)"
-}
+npm run create-admin || true
 
 echo "✅ Initialization complete!"
 echo "🌐 Starting API server..."
