@@ -1,9 +1,24 @@
+console.log('=========================================');
+console.log('📦 Starting server.js...');
+console.log('📦 Loading server dependencies...');
+
 const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const session = require('express-session');
 const path = require('path');
-const config = require('./config/config');
+
+console.log('📦 Loading configuration...');
+let config;
+try {
+    config = require('./config/config');
+    console.log('✓ Configuration loaded successfully');
+} catch (error) {
+    console.error('❌ FATAL: Failed to load configuration:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    process.exit(1);
+}
+
 const fileUtils = require('./utils/fileUtils');
 const errorHandler = require('./middleware/errorHandler');
 const db = require('./config/database');
@@ -171,6 +186,7 @@ fileUtils.setupDirectories(); // Ensure directories exist before starting
 
 // Initialize database connection
 async function startServer() {
+    console.log('🚀 Starting server initialization...');
     // Test database connection (optional - won't fail if DB is not configured)
     if (config.DB_HOST && config.DB_NAME) {
         try {

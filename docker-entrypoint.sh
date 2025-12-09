@@ -65,7 +65,12 @@ npm run create-admin || true
 
 echo "✅ Initialization complete!"
 echo "🌐 Starting API server..."
+echo "📝 Executing command: $@"
+echo "📝 Working directory: $(pwd)"
+echo "📝 Node version: $(node --version)"
+echo "📝 NPM version: $(npm --version)"
 
 # Start the application
+echo "🚀 Executing: $@"
 exec "$@"
 

@@ -104,8 +104,11 @@ const config = {
 
 // Validate required configuration
 if (!config.GEMINI_API_KEY) {
+    console.error("=========================================");
     console.error("FATAL ERROR: GEMINI_API_KEY environment variable is not set.");
     console.error("Please ensure your .env file is correct.");
+    console.error("The server will not start without this key.");
+    console.error("=========================================");
     process.exit(1);
 }
 
