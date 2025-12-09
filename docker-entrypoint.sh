@@ -49,6 +49,12 @@ wait_for_mysql || {
     exit 0
 }
 
+# Run users table creation script
+echo "📋 Creating users table..."
+npm run create-table || {
+    echo "⚠️ Warning: Users table creation had issues (table may already exist)"
+}
+
 # Run database table creation script
 echo "📊 Creating database tables..."
 npm run create-db-tables || {
