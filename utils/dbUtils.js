@@ -15,13 +15,13 @@ const db = require('../config/database');
  * @returns {Promise<Object>} Created course
  */
 async function createCourse(courseData) {
-    const { id, courseName, courseDescription } = courseData;
+    const { id, courseName, courseDescription, courseImage } = courseData;
     
     try {
         await db.query(
-            `INSERT INTO courses (id, course_name, course_description) 
-             VALUES (?, ?, ?)`,
-            [id, courseName, courseDescription || null]
+            `INSERT INTO courses (id, course_name, course_description, course_image) 
+             VALUES (?, ?, ?, ?)`,
+            [id, courseName, courseDescription || null, courseImage || null]
         );
         
         console.log(`[DB] Course created successfully: ${id} - ${courseName}`);
@@ -42,6 +42,7 @@ async function getAllCourses() {
             c.id,
             c.course_name as courseName,
             c.course_description as courseDescription,
+            c.course_image as courseImage,
             COUNT(ch.id) as chaptersCount,
             c.created_at as createdAt,
             c.updated_at as updatedAt
@@ -55,6 +56,7 @@ async function getAllCourses() {
         id: course.id,
         courseName: course.courseName,
         courseDescription: course.courseDescription,
+        courseImage: course.courseImage,
         chaptersCount: parseInt(course.chaptersCount) || 0,
         createdAt: course.createdAt,
         updatedAt: course.updatedAt
@@ -72,6 +74,7 @@ async function getCourseById(courseId) {
             id,
             course_name as courseName,
             course_description as courseDescription,
+            course_image as courseImage,
             created_at as createdAt,
             updated_at as updatedAt
          FROM courses 
@@ -103,6 +106,7 @@ async function getCourseById(courseId) {
         id: course.id,
         courseName: course.courseName,
         courseDescription: course.courseDescription,
+        courseImage: course.courseImage,
         chapters: chapters.map(ch => ({
             id: ch.id,
             chapterName: ch.chapterName,
@@ -133,6 +137,11 @@ async function updateCourse(courseId, updates) {
     if (updates.courseDescription !== undefined) {
         fields.push('course_description = ?');
         values.push(updates.courseDescription || null);
+    }
+    
+    if (updates.courseImage !== undefined) {
+        fields.push('course_image = ?');
+        values.push(updates.courseImage || null);
     }
     
     if (fields.length === 0) {
@@ -340,6 +349,41 @@ async function updateChapter(courseId, chapterId, updates) {
         values.push(updates.textContent || null);
     }
     
+    if (updates.textFilename !== undefined) {
+        fields.push('text_filename = ?');
+        values.push(updates.textFilename || null);
+    }
+    
+    if (updates.visualFilename !== undefined) {
+        fields.push('visual_filename = ?');
+        values.push(updates.visualFilename || null);
+    }
+    
+    if (updates.statementsFilename !== undefined) {
+        fields.push('statements_filename = ?');
+        values.push(updates.statementsFilename || null);
+    }
+    
+    if (updates.textLength !== undefined) {
+        fields.push('text_length = ?');
+        values.push(updates.textLength || 0);
+    }
+    
+    if (updates.numPagesText !== undefined) {
+        fields.push('num_pages_text = ?');
+        values.push(updates.numPagesText || 0);
+    }
+    
+    if (updates.numPagesVisual !== undefined) {
+        fields.push('num_pages_visual = ?');
+        values.push(updates.numPagesVisual || 0);
+    }
+    
+    if (updates.numPagesStatements !== undefined) {
+        fields.push('num_pages_statements = ?');
+        values.push(updates.numPagesStatements || 0);
+    }
+    
     if (updates.statements !== undefined) {
         fields.push('statements = ?');
         fields.push('statements_count = ?');
@@ -450,6 +494,318 @@ async function deleteChapterImage(imageId) {
     return result.affectedRows > 0;
 }
 
+/**
+ * Lab Database Operations
+ */
+
+/**
+ * Create a new lab
+ * @param {Object} labData - Lab data object
+ * @returns {Promise<Object>} Created lab
+ */
+async function createLab(labData) {
+    const { id, courseId, labName, labDescription, labType } = labData;
+    
+    try {
+        await db.query(
+            `INSERT INTO labs (id, course_id, lab_name, lab_description, lab_type) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [id, courseId, labName, labDescription || null, labType]
+        );
+        
+        console.log(`[DB] Lab created successfully: ${id} - ${labName}`);
+        return await getLabById(id);
+    } catch (error) {
+        console.error('[DB] Error creating lab:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get all labs from database
+ * @returns {Promise<Array>} Array of labs with exercise count
+ */
+async function getAllLabs() {
+    const labs = await db.query(
+        `SELECT 
+            l.id,
+            l.course_id as courseId,
+            l.lab_name as labName,
+            l.lab_description as labDescription,
+            l.lab_type as labType,
+            COUNT(e.id) as exercisesCount,
+            l.created_at as createdAt,
+            l.updated_at as updatedAt,
+            c.course_name as courseName
+         FROM labs l
+         LEFT JOIN exercises e ON l.id = e.lab_id
+         LEFT JOIN courses c ON l.course_id = c.id
+         GROUP BY l.id
+         ORDER BY l.created_at DESC`
+    );
+    
+    return labs.map(lab => ({
+        id: lab.id,
+        courseId: lab.courseId,
+        courseName: lab.courseName,
+        labName: lab.labName,
+        labDescription: lab.labDescription,
+        labType: lab.labType,
+        exercisesCount: parseInt(lab.exercisesCount) || 0,
+        createdAt: lab.createdAt,
+        updatedAt: lab.updatedAt
+    }));
+}
+
+/**
+ * Get lab by ID
+ * @param {string} labId - Lab ID
+ * @returns {Promise<Object|null>} Lab object or null
+ */
+async function getLabById(labId) {
+    const labs = await db.query(
+        `SELECT 
+            l.id,
+            l.course_id as courseId,
+            l.lab_name as labName,
+            l.lab_description as labDescription,
+            l.lab_type as labType,
+            l.created_at as createdAt,
+            l.updated_at as updatedAt,
+            c.course_name as courseName
+         FROM labs l
+         LEFT JOIN courses c ON l.course_id = c.id
+         WHERE l.id = ?`,
+        [labId]
+    );
+    
+    if (labs.length === 0) {
+        return null;
+    }
+    
+    return labs[0];
+}
+
+/**
+ * Get labs by course ID
+ * @param {string} courseId - Course ID
+ * @returns {Promise<Array>} Array of labs
+ */
+async function getLabsByCourseId(courseId) {
+    const labs = await db.query(
+        `SELECT 
+            l.id,
+            l.course_id as courseId,
+            l.lab_name as labName,
+            l.lab_description as labDescription,
+            l.lab_type as labType,
+            COUNT(e.id) as exercisesCount,
+            l.created_at as createdAt,
+            l.updated_at as updatedAt
+         FROM labs l
+         LEFT JOIN exercises e ON l.id = e.lab_id
+         WHERE l.course_id = ?
+         GROUP BY l.id
+         ORDER BY l.created_at DESC`,
+        [courseId]
+    );
+    
+    return labs.map(lab => ({
+        id: lab.id,
+        courseId: lab.courseId,
+        labName: lab.labName,
+        labDescription: lab.labDescription,
+        labType: lab.labType,
+        exercisesCount: parseInt(lab.exercisesCount) || 0,
+        createdAt: lab.createdAt,
+        updatedAt: lab.updatedAt
+    }));
+}
+
+/**
+ * Update lab
+ * @param {string} labId - Lab ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated lab
+ */
+async function updateLab(labId, updates) {
+    const fields = [];
+    const values = [];
+    
+    if (updates.labName !== undefined) {
+        fields.push('lab_name = ?');
+        values.push(updates.labName);
+    }
+    if (updates.labDescription !== undefined) {
+        fields.push('lab_description = ?');
+        values.push(updates.labDescription || null);
+    }
+    if (updates.labType !== undefined) {
+        fields.push('lab_type = ?');
+        values.push(updates.labType);
+    }
+    if (updates.courseId !== undefined) {
+        fields.push('course_id = ?');
+        values.push(updates.courseId);
+    }
+    
+    if (fields.length === 0) {
+        return await getLabById(labId);
+    }
+    
+    values.push(labId);
+    
+    await db.query(
+        `UPDATE labs SET ${fields.join(', ')} WHERE id = ?`,
+        values
+    );
+    
+    return await getLabById(labId);
+}
+
+/**
+ * Delete lab
+ * @param {string} labId - Lab ID
+ * @returns {Promise<boolean>} True if lab was deleted
+ */
+async function deleteLab(labId) {
+    const result = await db.query('DELETE FROM labs WHERE id = ?', [labId]);
+    return result.affectedRows > 0;
+}
+
+/**
+ * Exercise Database Operations
+ */
+
+/**
+ * Create a new exercise
+ * @param {Object} exerciseData - Exercise data object
+ * @returns {Promise<Object>} Created exercise
+ */
+async function createExercise(exerciseData) {
+    const { id, labId, exerciseName, exerciseDescription, pdfResource } = exerciseData;
+    
+    try {
+        await db.query(
+            `INSERT INTO exercises (id, lab_id, exercise_name, exercise_description, pdf_resource) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [id, labId, exerciseName, exerciseDescription || null, pdfResource || null]
+        );
+        
+        console.log(`[DB] Exercise created successfully: ${id} - ${exerciseName}`);
+        return await getExerciseById(id);
+    } catch (error) {
+        console.error('[DB] Error creating exercise:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get exercise by ID
+ * @param {string} exerciseId - Exercise ID
+ * @returns {Promise<Object|null>} Exercise object or null
+ */
+async function getExerciseById(exerciseId) {
+    const exercises = await db.query(
+        `SELECT 
+            e.id,
+            e.lab_id as labId,
+            e.exercise_name as exerciseName,
+            e.exercise_description as exerciseDescription,
+            e.pdf_resource as pdfResource,
+            e.created_at as createdAt,
+            e.updated_at as updatedAt,
+            l.lab_name as labName
+         FROM exercises e
+         LEFT JOIN labs l ON e.lab_id = l.id
+         WHERE e.id = ?`,
+        [exerciseId]
+    );
+    
+    if (exercises.length === 0) {
+        return null;
+    }
+    
+    return exercises[0];
+}
+
+/**
+ * Get exercises by lab ID
+ * @param {string} labId - Lab ID
+ * @returns {Promise<Array>} Array of exercises
+ */
+async function getExercisesByLabId(labId) {
+    const exercises = await db.query(
+        `SELECT DISTINCT
+            id,
+            lab_id as labId,
+            exercise_name as exerciseName,
+            exercise_description as exerciseDescription,
+            pdf_resource as pdfResource,
+            created_at as createdAt,
+            updated_at as updatedAt
+         FROM exercises 
+         WHERE lab_id = ?
+         ORDER BY created_at ASC`,
+        [labId]
+    );
+    
+    console.log(`[DB] Found ${exercises.length} exercises for lab ${labId}`);
+    
+    return exercises;
+}
+
+/**
+ * Update exercise
+ * @param {string} exerciseId - Exercise ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated exercise
+ */
+async function updateExercise(exerciseId, updates) {
+    const fields = [];
+    const values = [];
+    
+    if (updates.exerciseName !== undefined) {
+        fields.push('exercise_name = ?');
+        values.push(updates.exerciseName);
+    }
+    if (updates.exerciseDescription !== undefined) {
+        fields.push('exercise_description = ?');
+        values.push(updates.exerciseDescription || null);
+    }
+    if (updates.pdfResource !== undefined) {
+        fields.push('pdf_resource = ?');
+        values.push(updates.pdfResource || null);
+    }
+    if (updates.labId !== undefined) {
+        fields.push('lab_id = ?');
+        values.push(updates.labId);
+    }
+    
+    if (fields.length === 0) {
+        return await getExerciseById(exerciseId);
+    }
+    
+    values.push(exerciseId);
+    
+    await db.query(
+        `UPDATE exercises SET ${fields.join(', ')} WHERE id = ?`,
+        values
+    );
+    
+    return await getExerciseById(exerciseId);
+}
+
+/**
+ * Delete exercise
+ * @param {string} exerciseId - Exercise ID
+ * @returns {Promise<boolean>} True if exercise was deleted
+ */
+async function deleteExercise(exerciseId) {
+    const result = await db.query('DELETE FROM exercises WHERE id = ?', [exerciseId]);
+    return result.affectedRows > 0;
+}
+
 module.exports = {
     // Course operations
     createCourse,
@@ -469,6 +825,21 @@ module.exports = {
     addChapterImage,
     getChapterImages,
     deleteChapterImages,
-    deleteChapterImage
+    deleteChapterImage,
+    
+    // Lab operations
+    createLab,
+    getAllLabs,
+    getLabById,
+    getLabsByCourseId,
+    updateLab,
+    deleteLab,
+    
+    // Exercise operations
+    createExercise,
+    getExerciseById,
+    getExercisesByLabId,
+    updateExercise,
+    deleteExercise
 };
 

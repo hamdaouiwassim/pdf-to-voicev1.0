@@ -127,12 +127,30 @@ If you need to rollback to file-based storage:
 
 **Note:** Database and file storage can coexist - old JSON files won't interfere, but new data will only be in the database.
 
+## Recent Migrations
+
+### 2025-12-16: Add course_image column to courses table
+
+**File:** `docker/mysql/migrations/migration-2025-12-16.sql`
+
+**Description:** Adds `course_image` VARCHAR(500) column to the `courses` table to store course image filenames.
+
+**To apply:**
+```bash
+docker compose exec mysql mysql -u app_user -papp_password titan_academy < docker/mysql/migrations/migration-2025-12-16.sql
+```
+
+**Changes:**
+- Added `course_image` column after `course_description` in `courses` table
+- Migration is safe to run multiple times (checks if column exists first)
+
 ## Next Steps
 
 1. ✅ Tables created
 2. ✅ Controllers updated
 3. ✅ API endpoints working
-4. ⏳ Migrate existing data (if needed)
-5. ⏳ Add database indexes for performance (if needed)
-6. ⏳ Set up database backups
+4. ✅ Course image support added (2025-12-16)
+5. ⏳ Migrate existing data (if needed)
+6. ⏳ Add database indexes for performance (if needed)
+7. ⏳ Set up database backups
 

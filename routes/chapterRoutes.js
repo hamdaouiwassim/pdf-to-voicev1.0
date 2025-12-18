@@ -27,6 +27,10 @@ router.get('/:chapterId/page-timings', validation.validateDocId, chapterControll
 // GET /api/courses/:courseId/chapters/:chapterId/statements - Get chapter statements
 router.get('/:chapterId/statements', validation.validateDocId, chapterController.getChapterStatements);
 
+// PUT /api/courses/:courseId/chapters/:chapterId - Update a chapter
+// Note: File uploads are optional, so we don't use validateChapterUpload middleware
+router.put('/:chapterId', validation.validateDocId, chapterController.updateChapter);
+
 // DELETE /api/courses/:courseId/chapters/:chapterId - Delete a chapter
 router.delete('/:chapterId', validation.validateDocId, chapterController.deleteChapter);
 

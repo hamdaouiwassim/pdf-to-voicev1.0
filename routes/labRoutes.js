@@ -10,5 +10,7 @@ router.post(
     labController.runPythonLab,
 );
 
-module.exports = router;
+// POST /api/lab/feedback - Get specific feedback audio (e.g. empty input)
+router.post('/feedback', labController.getFeedbackAudio);
 
+module.exports = router;

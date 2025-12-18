@@ -397,7 +397,7 @@ async function getChapter(req, res) {
 
 /**
  * Get chapter file (PDF or WebP image)
- * GET /api/courses/:courseId/chapters/:chapterId/file?type=visual|text|webp&page=1
+ * GET /api/courses/:courseId/chapters/:chapterId/file?type=visual|text|statements|webp&page=1
  */
 async function getChapterFile(req, res) {
     try {
@@ -452,7 +452,14 @@ async function getChapterFile(req, res) {
                 }
                 pdfFilePath = path.join(chapterDir, chapter.textFilename);
                 filename = chapter.textFilename;
+            } else if (type === 'statements') {
+                if (!chapter.statementsFilename) {
+                    return res.status(404).json({ error: 'Statements PDF file not available for this chapter' });
+                }
+                pdfFilePath = path.join(chapterDir, chapter.statementsFilename);
+                filename = chapter.statementsFilename;
             } else {
+                // Default to visual PDF
                 if (!chapter.visualFilename) {
                     return res.status(404).json({ error: 'Visual PDF file not available for this chapter' });
                 }
@@ -812,6 +819,282 @@ async function getChapterStatements(req, res) {
 }
 
 /**
+ * Update a chapter
+ * PUT /api/courses/:courseId/chapters/:chapterId
+ * Supports updating text fields and PDF files
+ */
+async function updateChapter(req, res) {
+    try {
+        const { courseId, chapterId } = req.params;
+        
+        // Validate course exists
+        const course = await dbUtils.getCourseById(courseId);
+        if (!course) {
+            return res.status(404).json({ error: 'Course not found' });
+        }
+
+        // Validate chapter exists
+        const existingChapter = await dbUtils.getChapterById(courseId, chapterId);
+        if (!existingChapter) {
+            return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        // Get update fields from request body
+        const chapterName = typeof req.body?.chapterName === 'string' ? req.body.chapterName.trim() : undefined;
+        const chapterDescription = typeof req.body?.chapterDescription === 'string' ? req.body.chapterDescription.trim() : undefined;
+        const videoLink = typeof req.body?.videoLink === 'string' ? req.body.videoLink.trim() : undefined;
+
+        // Get PDF files if provided
+        const textPdfFile = req.files?.textPdfFile;
+        const visualPdfFile = req.files?.visualPdfFile;
+        const statementsPdfFile = req.files?.statementsPdfFile;
+
+        // Validate chapter name if provided
+        if (chapterName !== undefined) {
+            if (chapterName.length === 0) {
+                return res.status(400).json({ error: 'Chapter name cannot be empty' });
+            }
+            if (chapterName.length > 150) {
+                return res.status(400).json({ error: 'Chapter name must be less than 150 characters' });
+            }
+        }
+
+        // Validate video link if provided
+        if (videoLink !== undefined && videoLink.length > 0) {
+            try {
+                const url = new URL(videoLink);
+                if (!['http:', 'https:'].includes(url.protocol)) {
+                    return res.status(400).json({ 
+                        error: 'videoLink must be a valid HTTP or HTTPS URL' 
+                    });
+                }
+            } catch (urlError) {
+                return res.status(400).json({ 
+                    error: 'videoLink must be a valid URL' 
+                });
+            }
+        }
+
+        // Validate PDF files if provided
+        if (textPdfFile && !config.ALLOWED_MIME_TYPES.includes(textPdfFile.mimetype)) {
+            return res.status(400).json({ error: 'Text PDF file must be application/pdf' });
+        }
+        if (visualPdfFile && !config.ALLOWED_MIME_TYPES.includes(visualPdfFile.mimetype)) {
+            return res.status(400).json({ error: 'Visual PDF file must be application/pdf' });
+        }
+        if (statementsPdfFile && !config.ALLOWED_MIME_TYPES.includes(statementsPdfFile.mimetype)) {
+            return res.status(400).json({ error: 'Statements PDF file must be application/pdf' });
+        }
+
+        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        await fsPromises.mkdir(chapterDir, { recursive: true });
+
+        // Process PDF files if provided
+        let textResult = null;
+        let visualResult = null;
+        let statementsResult = null;
+        let statements = [];
+        let textPdfFilename = existingChapter.textFilename;
+        let visualPdfFilename = existingChapter.visualFilename;
+        let statementsPdfFilename = existingChapter.statementsFilename;
+        let webpImages = [];
+
+        // Process text PDF if provided
+        if (textPdfFile) {
+            // Delete old text PDF if exists
+            if (existingChapter.textFilename) {
+                const oldTextPath = path.join(chapterDir, existingChapter.textFilename);
+                try {
+                    await fsPromises.unlink(oldTextPath);
+                } catch (error) {
+                    if (error.code !== 'ENOENT') {
+                        console.warn(`[Chapter Update] Failed to delete old text PDF: ${error.message}`);
+                    }
+                }
+            }
+
+            const textPdfBuffer = textPdfFile.data;
+            textPdfFilename = `${chapterId}_text${constants.FILE_EXTENSIONS.PDF}`;
+            const textPdfPath = path.join(chapterDir, textPdfFilename);
+            
+            textResult = await pdfParse(textPdfBuffer);
+            await fsPromises.writeFile(textPdfPath, textPdfBuffer);
+            console.log(`[Chapter Update] Updated text PDF for chapter ${chapterId}`);
+        }
+
+        // Process visual PDF if provided
+        if (visualPdfFile) {
+            // Delete old visual PDF and WebP images if exists
+            if (existingChapter.visualFilename) {
+                const oldVisualPath = path.join(chapterDir, existingChapter.visualFilename);
+                try {
+                    await fsPromises.unlink(oldVisualPath);
+                } catch (error) {
+                    if (error.code !== 'ENOENT') {
+                        console.warn(`[Chapter Update] Failed to delete old visual PDF: ${error.message}`);
+                    }
+                }
+            }
+
+            // Delete old WebP images
+            const webpDir = path.join(chapterDir, 'webp');
+            try {
+                const webpFiles = await fsPromises.readdir(webpDir);
+                for (const file of webpFiles) {
+                    await fsPromises.unlink(path.join(webpDir, file));
+                }
+            } catch (error) {
+                // WebP directory might not exist, that's okay
+            }
+
+            // Delete old WebP images from database
+            await dbUtils.deleteChapterImages(chapterId);
+
+            const visualPdfBuffer = visualPdfFile.data;
+            visualPdfFilename = `${chapterId}_visual${constants.FILE_EXTENSIONS.PDF}`;
+            const visualPdfPath = path.join(chapterDir, visualPdfFilename);
+            
+            visualResult = await pdfParse(visualPdfBuffer);
+            await fsPromises.writeFile(visualPdfPath, visualPdfBuffer);
+
+            // Convert visual PDF to WebP images
+            try {
+                console.log(`[Chapter Update] Converting visual PDF to WebP for chapter ${chapterId}...`);
+                webpImages = await pdfToWebpUtils.convertPdfToWebp(visualPdfPath, webpDir, 2000);
+                console.log(`[Chapter Update] Converted ${webpImages.length} pages to WebP`);
+
+                // Store WebP images in database
+                for (let i = 0; i < webpImages.length; i++) {
+                    const imgPath = webpImages[i];
+                    const relativePath = path.relative(config.UPLOADS_DIR, imgPath);
+                    await dbUtils.addChapterImage(chapterId, {
+                        imagePath: relativePath,
+                        pageNumber: i + 1,
+                        imageType: 'webp'
+                    });
+                }
+            } catch (error) {
+                console.warn(`[Chapter Update] Failed to convert PDF to WebP: ${error.message}`);
+            }
+
+            console.log(`[Chapter Update] Updated visual PDF for chapter ${chapterId}`);
+        }
+
+        // Process statements PDF if provided
+        if (statementsPdfFile) {
+            // Delete old statements PDF if exists
+            if (existingChapter.statementsFilename) {
+                const oldStatementsPath = path.join(chapterDir, existingChapter.statementsFilename);
+                try {
+                    await fsPromises.unlink(oldStatementsPath);
+                } catch (error) {
+                    if (error.code !== 'ENOENT') {
+                        console.warn(`[Chapter Update] Failed to delete old statements PDF: ${error.message}`);
+                    }
+                }
+            }
+
+            const statementsPdfBuffer = statementsPdfFile.data;
+            statementsPdfFilename = `${chapterId}_statements${constants.FILE_EXTENSIONS.PDF}`;
+            const statementsPdfPath = path.join(chapterDir, statementsPdfFilename);
+            
+            statementsResult = await pdfParse(statementsPdfBuffer);
+            await fsPromises.writeFile(statementsPdfPath, statementsPdfBuffer);
+
+            // Extract statements
+            statements = await extractStatementsByPage(chapterId, statementsPdfBuffer);
+            if (statements.length < (statementsResult?.numpages || 0)) {
+                if (pdfjsLib) {
+                    try {
+                        const loadingTask = pdfjsLib.getDocument({ data: statementsPdfBuffer });
+                        const pdfDocument = await loadingTask.promise;
+                        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+                            if (statements.find(st => st.page === pageNum)) continue;
+
+                            const page = await pdfDocument.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            const lines = textContent.items
+                                .map(item => (item.str || '').trim())
+                                .filter(Boolean);
+
+                            const title = lines[0]?.slice(0, 160) || `Page ${pageNum}`;
+                            const body = lines.join('\n').trim();
+
+                            statements.push({
+                                id: `${chapterId}-statement-${pageNum}`,
+                                order: pageNum,
+                                page: pageNum,
+                                title,
+                                body: body || '(Page vide)'
+                            });
+                        }
+                        statements.sort((a, b) => a.page - b.page);
+                    } catch (innerError) {
+                        console.warn('[Chapter Update] Unable to backfill statement pages:', innerError.message);
+                    }
+                }
+            }
+
+            if ((!statements || statements.length === 0) && statementsResult?.text) {
+                statements = buildStatementsFromText(chapterId, statementsResult.text);
+            }
+
+            console.log(`[Chapter Update] Updated statements PDF for chapter ${chapterId}`);
+        }
+
+        // Build updates object
+        const updates = {};
+        if (chapterName !== undefined) updates.chapterName = chapterName;
+        if (chapterDescription !== undefined) updates.chapterDescription = chapterDescription || null;
+        if (videoLink !== undefined) updates.videoLink = videoLink || null;
+        
+        // Update PDF-related fields if files were provided
+        if (textPdfFile) {
+            updates.textContent = textResult?.text || null;
+            updates.textFilename = textPdfFilename;
+            updates.textLength = textResult?.text?.length || 0;
+            updates.numPagesText = textResult?.numpages || 0;
+        }
+        
+        if (visualPdfFile) {
+            updates.visualFilename = visualPdfFilename;
+            updates.numPagesVisual = visualResult?.numpages || 0;
+        }
+        
+        if (statementsPdfFile) {
+            updates.statementsFilename = statementsPdfFilename;
+            updates.statements = statements;
+            updates.statementsCount = statements?.length || 0;
+            updates.numPagesStatements = statementsResult?.numpages || 0;
+        }
+
+        // Update chapter in database
+        const updatedChapter = await dbUtils.updateChapter(courseId, chapterId, updates);
+
+        res.json({
+            chapterId: updatedChapter.id,
+            chapterName: updatedChapter.chapterName,
+            chapterDescription: updatedChapter.chapterDescription,
+            videoLink: updatedChapter.videoLink,
+            textFilename: updatedChapter.textFilename,
+            visualFilename: updatedChapter.visualFilename,
+            statementsFilename: updatedChapter.statementsFilename,
+            numPagesText: updatedChapter.numPagesText,
+            numPagesVisual: updatedChapter.numPagesVisual,
+            numPagesStatements: updatedChapter.numPagesStatements,
+            statementsCount: updatedChapter.statementsCount,
+            updatedAt: updatedChapter.updatedAt
+        });
+    } catch (error) {
+        console.error("[Chapter Update Error]:", error);
+        res.status(500).json({
+            error: 'Failed to update chapter.',
+            details: error.message
+        });
+    }
+}
+
+/**
  * Delete a chapter
  * DELETE /api/courses/:courseId/chapters/:chapterId
  */
@@ -861,6 +1144,7 @@ module.exports = {
     generateChapterLipSync,
     getChapterPageTimings,
     getChapterStatements,
+    updateChapter,
     deleteChapter
 };
 

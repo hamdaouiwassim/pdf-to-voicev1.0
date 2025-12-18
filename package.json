@@ -4,9 +4,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "create-table": "node scripts/createUsersTable.js",
-    "create-db-tables": "node scripts/createDatabaseTables.js",
-    "create-admin": "node scripts/createAdminUser.js",
+    "db:tables": "node scripts/database.js tables",
+    "db:users": "node scripts/database.js users",
+    "db:admin": "node scripts/database.js admin",
+    "db:all": "node scripts/database.js all",
+    "create-table": "node scripts/database.js users",
+    "create-db-tables": "node scripts/database.js tables",
+    "create-admin": "node scripts/database.js admin",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

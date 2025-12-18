@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Management - Titan Academy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-white shadow-lg mb-8">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-6">
+                    <a href="/index.html" class="flex items-center gap-2 text-gray-800 hover:text-indigo-600 transition-colors">
+                        <i class="fas fa-graduation-cap text-red-500 text-2xl"></i>
+                        <span class="text-xl font-bold">Titan Academy</span>
+                    </a>
+                    <div class="flex gap-4">
+                        <a href="/index.html" class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-book"></i>
+                            Courses
+                        </a>
+                        <a href="/users.html" class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-users"></i>
+                            Users
+                        </a>
+                        <a href="/subscriptions.html" class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-credit-card"></i>
+                            Subscriptions
+                        </a>
+                        <a href="/labs.html" class="px-4 py-2 text-indigo-600 bg-indigo-50 rounded-lg font-semibold flex items-center gap-2">
+                            <i class="fas fa-flask"></i>
+                            Labs
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- User Dropdown -->
+                    <div class="relative" id="userDropdownContainer">
+                        <button 
+                            id="userDropdownBtn"
+                            class="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-semibold">
+                                <span id="userInitials">A</span>
+                            </div>
+                            <span id="userEmailNav" class="hidden md:inline text-sm font-medium"></span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div 
+                            id="userDropdownMenu" 
+                            class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
+                        >
+                            <div class="px-4 py-2 border-b border-gray-200">
+                                <p class="text-sm font-semibold text-gray-800" id="dropdownUserName">User Name</p>
+                                <p class="text-xs text-gray-500" id="dropdownUserEmail">user@example.com</p>
+                            </div>
+                            <a href="/index.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <i class="fas fa-book w-4"></i>
+                                Manage Courses
+                            </a>
+                            <a href="/users.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <i class="fas fa-users w-4"></i>
+                                Manage Users
+                            </a>
+                            <a href="/subscriptions.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <i class="fas fa-credit-card w-4"></i>
+                                Manage Subscriptions
+                            </a>
+                            <a href="/labs.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <i class="fas fa-flask w-4"></i>
+                                Manage Labs
+                            </a>
+                            <div class="border-t border-gray-200 my-1"></div>
+                            <button 
+                                id="btnLogoutNav"
+                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            >
+                                <i class="fas fa-sign-out-alt w-4"></i>
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Page Header -->
+        <div class="mb-8 fade-in">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                <i class="fas fa-flask text-indigo-500"></i>
+                Lab Management
+            </h1>
+            <p class="text-gray-600">Manage labs and exercises for your courses</p>
+        </div>
+
+        <!-- Course Selection -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8 fade-in">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-graduation-cap text-indigo-500 mr-3"></i>
+                    Select Course
+                </h2>
+            </div>
+            <div class="mb-4">
+                <label for="courseSelect" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-book mr-2 text-indigo-500"></i>
+                    Course <span class="text-red-500">*</span>
+                </label>
+                <select
+                    id="courseSelect"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                    <option value="">-- Select a course --</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Labs List -->
+        <div id="labsSection" class="bg-white rounded-2xl shadow-xl p-8 fade-in hidden">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-flask text-indigo-500 mr-3"></i>
+                    Labs
+                </h2>
+                <button 
+                    id="btnAddLab" 
+                    class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg flex items-center"
+                >
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Add Lab
+                </button>
+            </div>
+
+            <div id="labsLoading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+                <p class="mt-4 text-gray-600">Loading labs...</p>
+            </div>
+
+            <div id="labsEmptyState" class="hidden text-center py-12">
+                <i class="fas fa-flask text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">No labs found</p>
+                <p class="text-gray-400 text-sm mt-2">Create a lab to get started</p>
+            </div>
+
+            <div id="labsList" class="space-y-4 hidden">
+                <!-- Labs will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Lab Modal -->
+    <div id="labModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h3 id="labModalTitle" class="text-2xl font-semibold text-gray-800">Add New Lab</h3>
+                <button id="closeLabModal" class="text-gray-400 hover:text-gray-600 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <form id="labForm">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="inpLabName" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-2 text-indigo-500"></i>
+                                Lab Name <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="inpLabName"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="e.g., Python Basics Lab"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label for="inpLabDescription" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-align-left mr-2 text-indigo-500"></i>
+                                Description
+                            </label>
+                            <textarea
+                                id="inpLabDescription"
+                                rows="4"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Lab description..."
+                            ></textarea>
+                        </div>
+                        <div>
+                            <label for="selLabType" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-code mr-2 text-indigo-500"></i>
+                                Lab Type <span class="text-red-500">*</span>
+                            </label>
+                            <select
+                                id="selLabType"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                            >
+                                <option value="python">Python</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="java">Java</option>
+                                <option value="cpp">C++</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex gap-3 justify-end">
+                        <button
+                            type="button"
+                            id="cancelLabBtn"
+                            class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all"
+                        >
+                            <i class="fas fa-save mr-2"></i>
+                            Save Lab
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Exercise Modal -->
+    <div id="exerciseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h3 id="exerciseModalTitle" class="text-2xl font-semibold text-gray-800">Add New Exercise</h3>
+                <button id="closeExerciseModal" class="text-gray-400 hover:text-gray-600 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <form id="exerciseForm">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="inpExerciseName" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-2 text-indigo-500"></i>
+                                Exercise Name <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="inpExerciseName"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="e.g., Exercise 1: Variables"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label for="inpExerciseDescription" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-align-left mr-2 text-indigo-500"></i>
+                                Description
+                            </label>
+                            <textarea
+                                id="inpExerciseDescription"
+                                rows="4"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Exercise description..."
+                            ></textarea>
+                        </div>
+                        <div>
+                            <label for="inpExercisePdf" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-file-pdf mr-2 text-indigo-500"></i>
+                                PDF Resource
+                            </label>
+                            <input
+                                type="file"
+                                id="inpExercisePdf"
+                                accept=".pdf"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">Maximum file size: 50MB</p>
+                            <div id="currentPdfInfo" class="mt-2 hidden p-3 bg-gray-50 rounded-lg">
+                                <p class="text-sm text-gray-700 mb-2">Current PDF:</p>
+                                <p id="currentPdfName" class="text-sm font-medium text-gray-800"></p>
+                                <div class="mt-2 flex gap-2">
+                                    <a id="viewCurrentPdf" href="#" target="_blank" class="text-sm text-blue-600 hover:text-blue-800">
+                                        <i class="fas fa-eye mr-1"></i>View
+                                    </a>
+                                    <a id="downloadCurrentPdf" href="#" download class="text-sm text-green-600 hover:text-green-800">
+                                        <i class="fas fa-download mr-1"></i>Download
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex gap-3 justify-end">
+                        <button
+                            type="button"
+                            id="cancelExerciseBtn"
+                            class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all"
+                        >
+                            <i class="fas fa-save mr-2"></i>
+                            Save Exercise
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        
+        let currentCourseId = null;
+        let currentLabId = null;
+        let currentExerciseId = null;
+        let isAuthenticated = false;
+        let allCourses = [];
+        let allLabs = [];
+
+        // Authentication Functions
+        async function checkAuthentication() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/status`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    isAuthenticated = true;
+                    showAuthenticatedUI(data);
+                    await loadCourses();
+                    return true;
+                } else {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking authentication:', error);
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        let currentUser = null;
+
+        function showAuthenticatedUI(authData) {
+            isAuthenticated = true;
+            currentUser = authData;
+            
+            const userEmail = authData.email || '';
+            const userName = authData.name || userEmail.split('@')[0];
+            
+            const userEmailNav = document.getElementById('userEmailNav');
+            if (userEmailNav) {
+                userEmailNav.textContent = userEmail;
+            }
+            
+            const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || userEmail[0].toUpperCase();
+            const userInitials = document.getElementById('userInitials');
+            if (userInitials) {
+                userInitials.textContent = initials;
+            }
+            
+            const dropdownUserName = document.getElementById('dropdownUserName');
+            const dropdownUserEmail = document.getElementById('dropdownUserEmail');
+            if (dropdownUserName) {
+                dropdownUserName.textContent = userName;
+            }
+            if (dropdownUserEmail) {
+                dropdownUserEmail.textContent = userEmail;
+            }
+        }
+
+        // User Dropdown Toggle
+        document.getElementById('userDropdownBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const menu = document.getElementById('userDropdownMenu');
+            menu.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('userDropdownContainer');
+            if (!container.contains(e.target)) {
+                document.getElementById('userDropdownMenu').classList.add('hidden');
+            }
+        });
+
+        // Logout
+        document.getElementById('btnLogoutNav').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login.html';
+            }
+        });
+
+        // Load Courses
+        async function loadCourses() {
+            try {
+                const response = await fetch(`${API_BASE}/api/courses`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to load courses');
+                allCourses = await response.json();
+                
+                const courseSelect = document.getElementById('courseSelect');
+                courseSelect.innerHTML = '<option value="">-- Select a course --</option>';
+                allCourses.forEach(course => {
+                    const option = document.createElement('option');
+                    option.value = course.id;
+                    option.textContent = course.courseName;
+                    courseSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading courses:', error);
+                showNotification('Failed to load courses', 'error');
+            }
+        }
+
+        // Course Selection Handler
+        document.getElementById('courseSelect').addEventListener('change', async (e) => {
+            currentCourseId = e.target.value;
+            if (currentCourseId) {
+                await loadLabs();
+                document.getElementById('labsSection').classList.remove('hidden');
+            } else {
+                document.getElementById('labsSection').classList.add('hidden');
+            }
+        });
+
+        // Load Labs
+        async function loadLabs() {
+            if (!currentCourseId) return;
+            
+            const labsList = document.getElementById('labsList');
+            const labsLoading = document.getElementById('labsLoading');
+            const labsEmptyState = document.getElementById('labsEmptyState');
+            
+            labsList.classList.add('hidden');
+            labsLoading.classList.remove('hidden');
+            labsEmptyState.classList.add('hidden');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/labs`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to load labs');
+                allLabs = await response.json();
+                
+                // Filter labs by course
+                const courseLabs = allLabs.filter(lab => lab.courseId === currentCourseId);
+                
+                labsLoading.classList.add('hidden');
+                
+                if (courseLabs.length === 0) {
+                    labsEmptyState.classList.remove('hidden');
+                } else {
+                    labsList.classList.remove('hidden');
+                    renderLabs(courseLabs);
+                }
+            } catch (error) {
+                console.error('Error loading labs:', error);
+                labsLoading.classList.add('hidden');
+                showNotification('Failed to load labs', 'error');
+            }
+        }
+
+        // Render Labs
+        function renderLabs(labs) {
+            const labsList = document.getElementById('labsList');
+            labsList.innerHTML = '';
+            
+            labs.forEach(lab => {
+                const labCard = document.createElement('div');
+                labCard.className = 'bg-gray-50 rounded-lg p-6 card-hover border border-gray-200';
+                labCard.innerHTML = `
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex-1">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-flask text-indigo-500"></i>
+                                ${escapeHtml(lab.labName)}
+                            </h3>
+                            <div class="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                                <span class="flex items-center gap-1">
+                                    <i class="fas fa-code"></i>
+                                    Type: <span class="font-medium">${escapeHtml(lab.labType)}</span>
+                                </span>
+                            </div>
+                            ${lab.labDescription ? `<p class="text-gray-600 text-sm mb-4">${escapeHtml(lab.labDescription)}</p>` : ''}
+                        </div>
+                        <div class="flex gap-2">
+                            <button 
+                                onclick="editLab('${lab.id}')"
+                                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                title="Edit Lab"
+                            >
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button 
+                                onclick="deleteLab('${lab.id}')"
+                                class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                                title="Delete Lab"
+                            >
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-lg font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-dumbbell text-green-500"></i>
+                                Exercises
+                            </h4>
+                            <button 
+                                onclick="addExercise('${lab.id}')"
+                                class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm flex items-center gap-2"
+                            >
+                                <i class="fas fa-plus"></i>
+                                Add Exercise
+                            </button>
+                        </div>
+                        <div id="exercises-${lab.id}" class="space-y-2">
+                            <div class="text-center py-4 text-gray-500 text-sm">
+                                <i class="fas fa-spinner fa-spin"></i> Loading exercises...
+                            </div>
+                        </div>
+                    </div>
+                `;
+                labsList.appendChild(labCard);
+                loadExercises(lab.id);
+            });
+        }
+
+        // Load Exercises for a Lab
+        async function loadExercises(labId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/labs/${labId}/exercises`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to load exercises');
+                const exercises = await response.json();
+                
+                const exercisesContainer = document.getElementById(`exercises-${labId}`);
+                if (exercises.length === 0) {
+                    exercisesContainer.innerHTML = `
+                        <div class="text-center py-4 text-gray-500 text-sm">
+                            <i class="fas fa-inbox"></i> No exercises yet
+                        </div>
+                    `;
+                } else {
+                    exercisesContainer.innerHTML = exercises.map(exercise => `
+                        <div class="bg-white rounded-lg p-4 border border-gray-200 flex items-center justify-between">
+                            <div class="flex-1">
+                                <h5 class="font-semibold text-gray-800 mb-1">${escapeHtml(exercise.exerciseName)}</h5>
+                                ${exercise.exerciseDescription ? `<p class="text-sm text-gray-600">${escapeHtml(exercise.exerciseDescription)}</p>` : ''}
+                                ${exercise.pdfResource ? `
+                                    <div class="mt-2 flex gap-2">
+                                        <a href="${API_BASE}/api/exercises/${exercise.id}/pdf" target="_blank" class="text-xs text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-file-pdf mr-1"></i>View PDF
+                                        </a>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="flex gap-2">
+                                <button 
+                                    onclick="editExercise('${exercise.id}', '${labId}')"
+                                    class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                                    title="Edit Exercise"
+                                >
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button 
+                                    onclick="deleteExercise('${exercise.id}', '${labId}')"
+                                    class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+                                    title="Delete Exercise"
+                                >
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading exercises:', error);
+                const exercisesContainer = document.getElementById(`exercises-${labId}`);
+                exercisesContainer.innerHTML = `
+                    <div class="text-center py-4 text-red-500 text-sm">
+                        <i class="fas fa-exclamation-triangle"></i> Failed to load exercises
+                    </div>
+                `;
+            }
+        }
+
+        // Add Lab
+        document.getElementById('btnAddLab').addEventListener('click', () => {
+            currentLabId = null;
+            document.getElementById('labModalTitle').textContent = 'Add New Lab';
+            document.getElementById('labForm').reset();
+            document.getElementById('labModal').classList.remove('hidden');
+        });
+
+        // Edit Lab
+        window.editLab = async function(labId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/labs/${labId}`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to load lab');
+                const lab = await response.json();
+                
+                currentLabId = labId;
+                document.getElementById('labModalTitle').textContent = 'Edit Lab';
+                document.getElementById('inpLabName').value = lab.labName || '';
+                document.getElementById('inpLabDescription').value = lab.labDescription || '';
+                document.getElementById('selLabType').value = lab.labType || 'python';
+                document.getElementById('labModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading lab:', error);
+                showNotification('Failed to load lab', 'error');
+            }
+        };
+
+        // Delete Lab
+        window.deleteLab = async function(labId) {
+            if (!confirm('Are you sure you want to delete this lab? All exercises will also be deleted.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/labs/${labId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to delete lab');
+                showNotification('Lab deleted successfully', 'success');
+                await loadLabs();
+            } catch (error) {
+                console.error('Error deleting lab:', error);
+                showNotification('Failed to delete lab', 'error');
+            }
+        };
+
+        // Lab Form Submit
+        document.getElementById('labForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!currentCourseId) {
+                showNotification('Please select a course first', 'error');
+                return;
+            }
+            
+            const formData = {
+                courseId: currentCourseId,
+                labName: document.getElementById('inpLabName').value.trim(),
+                labDescription: document.getElementById('inpLabDescription').value.trim(),
+                labType: document.getElementById('selLabType').value
+            };
+            
+            try {
+                const url = currentLabId 
+                    ? `${API_BASE}/api/labs/${currentLabId}`
+                    : `${API_BASE}/api/labs`;
+                const method = currentLabId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to save lab');
+                }
+                
+                showNotification(currentLabId ? 'Lab updated successfully' : 'Lab created successfully', 'success');
+                document.getElementById('labModal').classList.add('hidden');
+                await loadLabs();
+            } catch (error) {
+                console.error('Error saving lab:', error);
+                showNotification(error.message || 'Failed to save lab', 'error');
+            }
+        });
+
+        // Add Exercise
+        window.addExercise = function(labId) {
+            currentLabId = labId;
+            currentExerciseId = null;
+            document.getElementById('exerciseModalTitle').textContent = 'Add New Exercise';
+            document.getElementById('exerciseForm').reset();
+            document.getElementById('currentPdfInfo').classList.add('hidden');
+            document.getElementById('exerciseModal').classList.remove('hidden');
+        };
+
+        // Edit Exercise
+        window.editExercise = async function(exerciseId, labId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/exercises/${exerciseId}`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to load exercise');
+                const exercise = await response.json();
+                
+                currentExerciseId = exerciseId;
+                currentLabId = labId;
+                document.getElementById('exerciseModalTitle').textContent = 'Edit Exercise';
+                document.getElementById('inpExerciseName').value = exercise.exerciseName || '';
+                document.getElementById('inpExerciseDescription').value = exercise.exerciseDescription || '';
+                
+                if (exercise.pdfResource) {
+                    document.getElementById('currentPdfInfo').classList.remove('hidden');
+                    document.getElementById('currentPdfName').textContent = exercise.pdfResource;
+                    document.getElementById('viewCurrentPdf').href = `${API_BASE}/api/exercises/${exerciseId}/pdf`;
+                    document.getElementById('downloadCurrentPdf').href = `${API_BASE}/api/exercises/${exerciseId}/pdf`;
+                } else {
+                    document.getElementById('currentPdfInfo').classList.add('hidden');
+                }
+                
+                document.getElementById('exerciseModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading exercise:', error);
+                showNotification('Failed to load exercise', 'error');
+            }
+        };
+
+        // Delete Exercise
+        window.deleteExercise = async function(exerciseId, labId) {
+            if (!confirm('Are you sure you want to delete this exercise?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/exercises/${exerciseId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to delete exercise');
+                showNotification('Exercise deleted successfully', 'success');
+                loadExercises(labId);
+            } catch (error) {
+                console.error('Error deleting exercise:', error);
+                showNotification('Failed to delete exercise', 'error');
+            }
+        };
+
+        // Exercise Form Submit
+        document.getElementById('exerciseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!currentLabId) {
+                showNotification('Lab ID is missing', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('exerciseName', document.getElementById('inpExerciseName').value.trim());
+            formData.append('exerciseDescription', document.getElementById('inpExerciseDescription').value.trim());
+            
+            const pdfFile = document.getElementById('inpExercisePdf').files[0];
+            if (pdfFile) {
+                formData.append('pdfResource', pdfFile);
+            }
+            
+            try {
+                const url = currentExerciseId 
+                    ? `${API_BASE}/api/exercises/${currentExerciseId}`
+                    : `${API_BASE}/api/labs/${currentLabId}/exercises`;
+                const method = currentExerciseId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method,
+                    credentials: 'include',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to save exercise');
+                }
+                
+                showNotification(currentExerciseId ? 'Exercise updated successfully' : 'Exercise created successfully', 'success');
+                document.getElementById('exerciseModal').classList.add('hidden');
+                loadExercises(currentLabId);
+            } catch (error) {
+                console.error('Error saving exercise:', error);
+                showNotification(error.message || 'Failed to save exercise', 'error');
+            }
+        });
+
+        // Modal Close Handlers
+        document.getElementById('closeLabModal').addEventListener('click', () => {
+            document.getElementById('labModal').classList.add('hidden');
+        });
+        document.getElementById('cancelLabBtn').addEventListener('click', () => {
+            document.getElementById('labModal').classList.add('hidden');
+        });
+        document.getElementById('closeExerciseModal').addEventListener('click', () => {
+            document.getElementById('exerciseModal').classList.add('hidden');
+        });
+        document.getElementById('cancelExerciseBtn').addEventListener('click', () => {
+            document.getElementById('exerciseModal').classList.add('hidden');
+        });
+
+        // Utility Functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                'bg-blue-500'
+            } text-white`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.3s';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize
+        checkAuthentication();
+    </script>
+</body>
+</html>

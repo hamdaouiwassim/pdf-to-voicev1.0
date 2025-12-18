@@ -131,11 +131,11 @@ function validateQuestionRequest(req, res, next) {
 }
 
 /**
- * Validate document ID parameter (supports docId, courseId, chapterId)
+ * Validate document ID parameter (supports docId, courseId, chapterId, labId, exerciseId)
  */
 function validateDocId(req, res, next) {
-    // Check for docId, courseId, or chapterId in params
-    const id = req.params.docId || req.params.courseId || req.params.chapterId;
+    // Check for docId, courseId, chapterId, labId, or exerciseId in params
+    const id = req.params.docId || req.params.courseId || req.params.chapterId || req.params.labId || req.params.exerciseId;
 
     if (!id) {
         return res.status(400).json({ error: constants.ERROR_MESSAGES.DOC_ID_REQUIRED });

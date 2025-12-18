@@ -1,6 +1,9 @@
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs').promises;
 const dbUtils = require('../utils/dbUtils');
 const subscriptionUtils = require('../utils/subscriptionUtils');
+const config = require('../config/config');
 
 /**
  * Create a new course
@@ -22,17 +25,48 @@ async function createCourse(req, res) {
         // Generate unique ID for the course
         const courseId = crypto.randomUUID();
 
+        // Handle course image upload if provided
+        let courseImageFilename = null;
+        const courseImageFile = req.files?.courseImage;
+        
+        if (courseImageFile) {
+            // Validate image file
+            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+            if (!allowedImageTypes.includes(courseImageFile.mimetype)) {
+                return res.status(400).json({ error: 'Course image must be a valid image file (JPEG, PNG, WebP, or GIF)' });
+            }
+            
+            if (courseImageFile.size > 5 * 1024 * 1024) { // 5MB limit
+                return res.status(400).json({ error: 'Course image must be less than 5MB' });
+            }
+
+            // Create course directory
+            const courseDir = path.join(config.UPLOADS_DIR, 'courses', courseId);
+            await fs.mkdir(courseDir, { recursive: true });
+
+            // Get file extension
+            const ext = path.extname(courseImageFile.name) || '.jpg';
+            courseImageFilename = `course_image${ext}`;
+            const imagePath = path.join(courseDir, courseImageFilename);
+
+            // Save image file
+            await courseImageFile.mv(imagePath);
+            console.log(`[Course] Saved course image: ${imagePath}`);
+        }
+
         // Create course in database
         const course = await dbUtils.createCourse({
             id: courseId,
             courseName: courseName,
-            courseDescription: courseDescription || null
+            courseDescription: courseDescription || null,
+            courseImage: courseImageFilename
         });
 
         res.json({
             courseId: course.id,
             courseName: course.courseName,
             courseDescription: course.courseDescription,
+            courseImage: course.courseImage,
             chapters: [],
             createdAt: course.createdAt
         });
@@ -157,12 +191,54 @@ async function updateCourse(req, res) {
         if (courseName) updates.courseName = courseName;
         if (courseDescription !== undefined) updates.courseDescription = courseDescription;
 
+        // Handle course image upload if provided
+        const courseImageFile = req.files?.courseImage;
+        if (courseImageFile) {
+            // Validate image file
+            const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+            if (!allowedImageTypes.includes(courseImageFile.mimetype)) {
+                return res.status(400).json({ error: 'Course image must be a valid image file (JPEG, PNG, WebP, or GIF)' });
+            }
+            
+            if (courseImageFile.size > 5 * 1024 * 1024) { // 5MB limit
+                return res.status(400).json({ error: 'Course image must be less than 5MB' });
+            }
+
+            // Create course directory if it doesn't exist
+            const courseDir = path.join(config.UPLOADS_DIR, 'courses', courseId);
+            await fs.mkdir(courseDir, { recursive: true });
+
+            // Delete old image if it exists
+            if (existingCourse.courseImage) {
+                const oldImagePath = path.join(courseDir, existingCourse.courseImage);
+                try {
+                    await fs.unlink(oldImagePath);
+                } catch (error) {
+                    // Ignore if file doesn't exist
+                    if (error.code !== 'ENOENT') {
+                        console.warn(`[Course] Failed to delete old image: ${error.message}`);
+                    }
+                }
+            }
+
+            // Get file extension
+            const ext = path.extname(courseImageFile.name) || '.jpg';
+            const courseImageFilename = `course_image${ext}`;
+            const imagePath = path.join(courseDir, courseImageFilename);
+
+            // Save new image file
+            await courseImageFile.mv(imagePath);
+            updates.courseImage = courseImageFilename;
+            console.log(`[Course] Updated course image: ${imagePath}`);
+        }
+
         const course = await dbUtils.updateCourse(courseId, updates);
 
         res.json({
             courseId: course.id,
             courseName: course.courseName,
             courseDescription: course.courseDescription,
+            courseImage: course.courseImage,
             chapters: course.chapters,
             updatedAt: course.updatedAt
         });

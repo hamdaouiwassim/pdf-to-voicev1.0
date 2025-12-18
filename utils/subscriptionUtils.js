@@ -14,7 +14,7 @@ const db = require('../config/database');
  */
 async function createSubscription(subscriptionData) {
     const { name, description, price, durationDays, isActive, features } = subscriptionData;
-    
+
     try {
         await db.query(
             `INSERT INTO subscriptions (name, description, price, duration_days, is_active, features)
@@ -28,10 +28,10 @@ async function createSubscription(subscriptionData) {
                 features ? JSON.stringify(features) : null
             ]
         );
-        
+
         const result = await db.query('SELECT LAST_INSERT_ID() as id');
         const subscriptionId = result[0].id;
-        
+
         console.log(`[DB] Subscription created successfully: ${subscriptionId} - ${name}`);
         return await getSubscriptionById(subscriptionId);
     } catch (error) {
@@ -105,9 +105,9 @@ async function updateSubscription(subscriptionId, updates) {
     const values = [];
 
     for (const [key, value] of Object.entries(updates)) {
-        const dbKey = key === 'durationDays' ? 'duration_days' : 
-                      key === 'isActive' ? 'is_active' : key;
-        
+        const dbKey = key === 'durationDays' ? 'duration_days' :
+            key === 'isActive' ? 'is_active' : key;
+
         if (allowedFields.includes(dbKey)) {
             updateFields.push(`${dbKey} = ?`);
             if (dbKey === 'features' && value !== null) {
@@ -524,7 +524,7 @@ async function getUserEnrolledCourses(userId) {
     // Try to get enrollments, handling is_active column gracefully
     let enrollments;
     let hasIsActiveColumn = false;
-    
+
     // First, check if is_active column exists by querying table structure
     try {
         const columnCheck = await db.query(
@@ -539,7 +539,7 @@ async function getUserEnrolledCourses(userId) {
         // If we can't check, assume column doesn't exist
         hasIsActiveColumn = false;
     }
-    
+
     // Now query based on whether column exists
     if (hasIsActiveColumn) {
         enrollments = await db.query(
@@ -597,23 +597,23 @@ async function cancelUserEnrollment(userId, courseId) {
             'UPDATE course_enrollments SET is_active = FALSE WHERE user_id = ? AND course_id = ?',
             [userId, courseId]
         );
-        
+
         if (result.affectedRows > 0) {
             console.log(`[DB] User ${userId} unenrolled from course ${courseId} (soft delete)`);
             return true;
         }
-        
+
         // If update didn't work, try delete
         const deleteResult = await db.query(
             'DELETE FROM course_enrollments WHERE user_id = ? AND course_id = ?',
             [userId, courseId]
         );
-        
+
         if (deleteResult.affectedRows > 0) {
             console.log(`[DB] User ${userId} unenrolled from course ${courseId} (hard delete)`);
             return true;
         }
-        
+
         return false;
     } catch (error) {
         // If column doesn't exist, delete the record
@@ -635,43 +635,55 @@ async function cancelUserEnrollment(userId, courseId) {
 async function canUserAccessCourse(userId, courseId) {
     const now = new Date();
 
-    // Helper to run a query and fallback if is_active column doesn't exist
-    const runQueryWithFallback = async (queryWithActive, queryWithoutActive, params) => {
+    // Cache the schema check result to avoid repeated DB calls
+    // We use a static property on the function to persist between calls
+    if (canUserAccessCourse.hasIsActiveColumn === undefined) {
         try {
-            return await db.query(queryWithActive, params);
+            const columnCheck = await db.query(
+                `SELECT COLUMN_NAME 
+                 FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = DATABASE() 
+                 AND TABLE_NAME = 'course_enrollments' 
+                 AND COLUMN_NAME = 'is_active'`
+            );
+            canUserAccessCourse.hasIsActiveColumn = columnCheck.length > 0;
         } catch (error) {
-            if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('is_active')) {
-                return await db.query(queryWithoutActive, params);
-            }
-            throw error;
+            console.warn("[DB] Failed to check schema for is_active, assuming false", error.message);
+            canUserAccessCourse.hasIsActiveColumn = false;
         }
-    };
+    }
+
+    const hasIsActive = canUserAccessCourse.hasIsActiveColumn;
 
     // First check for direct enrollment (subscription_id is NULL - admin enrolled)
-    const directEnrollment = await runQueryWithFallback(
-        `SELECT ce.id
+    let directEnrollmentQuery;
+    if (hasIsActive) {
+        directEnrollmentQuery = `SELECT ce.id
          FROM course_enrollments ce
          WHERE ce.user_id = ?
            AND ce.course_id = ?
            AND (ce.is_active IS NULL OR ce.is_active = TRUE)
            AND ce.subscription_id IS NULL
-         LIMIT 1`,
-        `SELECT ce.id
+         LIMIT 1`;
+    } else {
+        directEnrollmentQuery = `SELECT ce.id
          FROM course_enrollments ce
          WHERE ce.user_id = ?
            AND ce.course_id = ?
            AND ce.subscription_id IS NULL
-         LIMIT 1`,
-        [userId, courseId]
-    );
+         LIMIT 1`;
+    }
+
+    const directEnrollment = await db.query(directEnrollmentQuery, [userId, courseId]);
 
     if (directEnrollment.length > 0) {
         return true;
     }
 
     // Check for enrollment with active subscription
-    const subscriptionEnrollment = await runQueryWithFallback(
-        `SELECT ce.id
+    let subscriptionEnrollmentQuery;
+    if (hasIsActive) {
+        subscriptionEnrollmentQuery = `SELECT ce.id
          FROM course_enrollments ce
          INNER JOIN user_subscriptions us ON ce.subscription_id = us.subscription_id
          WHERE ce.user_id = ?
@@ -679,17 +691,19 @@ async function canUserAccessCourse(userId, courseId) {
            AND (ce.is_active IS NULL OR ce.is_active = TRUE)
            AND us.is_active = TRUE
            AND us.end_date > ?
-         LIMIT 1`,
-        `SELECT ce.id
+         LIMIT 1`;
+    } else {
+        subscriptionEnrollmentQuery = `SELECT ce.id
          FROM course_enrollments ce
          INNER JOIN user_subscriptions us ON ce.subscription_id = us.subscription_id
          WHERE ce.user_id = ?
            AND ce.course_id = ?
            AND us.is_active = TRUE
            AND us.end_date > ?
-         LIMIT 1`,
-        [userId, courseId, now]
-    );
+         LIMIT 1`;
+    }
+
+    const subscriptionEnrollment = await db.query(subscriptionEnrollmentQuery, [userId, courseId, now]);
 
     return subscriptionEnrollment.length > 0;
 }
@@ -701,7 +715,7 @@ module.exports = {
     getSubscriptionById,
     updateSubscription,
     deleteSubscription,
-    
+
     // User subscription operations
     assignSubscriptionToUser,
     getUserActiveSubscription,
@@ -709,12 +723,12 @@ module.exports = {
     getUserSubscriptions,
     getUserSubscriptionById,
     cancelUserSubscription,
-    
+
     // Course-subscription relationship operations
     linkSubscriptionToCourses,
     getCoursesForSubscription,
     getSubscriptionsForCourse,
-    
+
     // Course enrollment operations
     isUserEnrolledInCourse,
     enrollUserInCourse,

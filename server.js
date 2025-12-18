@@ -38,6 +38,9 @@ const chapterRoutes = require('./routes/chapterRoutes');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const labManagementRoutes = require('./routes/labManagementRoutes');
+const exerciseRoutes = require('./routes/exerciseRoutes');
+const courseLabRoutes = require('./routes/courseLabRoutes');
 
 // Initialize Express app
 const app = express();
@@ -94,6 +97,10 @@ app.get('/index.html', requireAuth, (req, res) => {
 
 app.get('/users.html', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'users.html'));
+});
+
+app.get('/labs.html', requireAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'labs.html'));
 });
 
 // Serve static files (login.html is public, index.html is protected above)
@@ -165,6 +172,21 @@ app.delete('/api/users/:userId/enroll/:courseId', requireAuth, subscriptionContr
 // Course and Chapter routes (protected - require subscription and enrollment)
 app.use('/api/courses', requireAuth, requireSubscription, courseRoutes);
 app.use('/api/courses/:courseId/chapters', requireAuth, requireSubscription, chapterRoutes);
+
+// Lab management routes (protected - require auth)
+app.use('/api/labs', requireAuth, labManagementRoutes);
+
+// Course-specific labs route - use a more explicit handler
+app.get('/api/courses/:courseId/labs', requireAuth, (req, res, next) => {
+    // Create a new request object with courseId in params
+    req.params = req.params || {};
+    req.params.courseId = req.params.courseId;
+    // Call the controller directly
+    const labManagementController = require('./controllers/labManagementController');
+    return labManagementController.getLabsByCourse(req, res, next);
+});
+
+app.use('/api/exercises', requireAuth, exerciseRoutes);
 
 // User management routes (protected)
 app.use('/api/users', requireAuth, userRoutes);

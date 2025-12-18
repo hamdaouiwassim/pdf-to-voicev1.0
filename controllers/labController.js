@@ -272,7 +272,56 @@ async function runPythonLab(req, res) {
     }
 }
 
+
+async function getFeedbackAudio(req, res) {
+    try {
+        const { type } = req.body;
+        let textToSpeak = "";
+
+        if (type === 'empty_input') {
+            textToSpeak = "La zone d'interprétation est vide. Écris quelques lignes de code Python pour que je puisse t'aider !";
+        } else {
+            return res.status(400).json({ error: "Type de feedback inconnu." });
+        }
+
+        let audioId = null;
+        let lipSyncReady = false;
+
+        try {
+            // Check cache first? For now, we generate fresh or rely on fileUtils cache if we used consistent IDs
+            // But here we'll just generate.
+
+            // To avoid re-generating the same static audio every time, we could use a static ID for this type
+            // But for simplicity and consistency with existing flow, we generate new one or handle it dynamically
+            const feedbackAudio = await synthesizeFeedbackAudio(textToSpeak);
+
+            if (feedbackAudio?.audioBuffer) {
+                audioId = `${constants.AUDIO_PREFIXES.LAB}${crypto.randomUUID()}`;
+                await fileUtils.saveAudioFile(audioId, feedbackAudio.audioBuffer);
+                lipSyncReady = await attachLipSync(audioId);
+            }
+        } catch (audioError) {
+            console.warn('[Lab] Failed to prepare feedback audio:', audioError.message);
+            return res.status(500).json({ error: "Erreur de génération audio." });
+        }
+
+        res.json({
+            feedback: {
+                text: textToSpeak,
+                audioUrl: audioId ? `/api/audio/${audioId}` : null,
+                audioId,
+                lipSyncUrl: lipSyncReady ? `/audios/${audioId}.json` : null,
+            }
+        });
+
+    } catch (error) {
+        console.error('[Lab] Feedback generation failed:', error);
+        res.status(500).json({ error: "Impossible de générer le feedback." });
+    }
+}
+
 module.exports = {
     runPythonLab,
+    getFeedbackAudio
 };
 

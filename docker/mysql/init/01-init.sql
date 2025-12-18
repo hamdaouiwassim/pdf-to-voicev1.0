@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS courses (
     id VARCHAR(36) PRIMARY KEY,
     course_name VARCHAR(255) NOT NULL,
     course_description TEXT,
+    course_image VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_course_name (course_name),
@@ -137,6 +138,37 @@ CREATE TABLE IF NOT EXISTS course_enrollments (
     INDEX idx_user_id (user_id),
     INDEX idx_course_id (course_id),
     INDEX idx_subscription_id (subscription_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create labs table
+CREATE TABLE IF NOT EXISTS labs (
+    id VARCHAR(36) PRIMARY KEY,
+    course_id VARCHAR(36) NOT NULL,
+    lab_name VARCHAR(255) NOT NULL,
+    lab_description TEXT,
+    lab_type VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    INDEX idx_course_id (course_id),
+    INDEX idx_lab_name (lab_name),
+    INDEX idx_lab_type (lab_type),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create exercises table
+CREATE TABLE IF NOT EXISTS exercises (
+    id VARCHAR(36) PRIMARY KEY,
+    lab_id VARCHAR(36) NOT NULL,
+    exercise_name VARCHAR(255) NOT NULL,
+    exercise_description TEXT,
+    pdf_resource VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (lab_id) REFERENCES labs(id) ON DELETE CASCADE,
+    INDEX idx_lab_id (lab_id),
+    INDEX idx_exercise_name (exercise_name),
+    INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Grant privileges to the application user
