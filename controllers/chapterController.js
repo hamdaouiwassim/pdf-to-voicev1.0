@@ -114,11 +114,11 @@ async function ensureChapterAudio(chapterId) {
         'SELECT text_content, course_id FROM chapters WHERE id = ? LIMIT 1',
         [chapterId]
     );
-    
+
     if (chapters.length === 0) {
         throw new Error('Chapter not found in database.');
     }
-    
+
     const text = chapters[0].text_content;
     if (!text) {
         throw new Error('Chapter content not found for audio generation.');
@@ -137,7 +137,7 @@ async function ensureChapterAudio(chapterId) {
 async function createChapter(req, res) {
     try {
         const { courseId } = req.params;
-        
+
         // Validate course exists
         const course = await dbUtils.getCourseById(courseId);
         if (!course) {
@@ -147,7 +147,7 @@ async function createChapter(req, res) {
         // File validation is handled by middleware
         const videoLink = typeof req.body?.video_link === 'string' ? req.body.video_link.trim() : null;
         const hasVideoLink = videoLink && videoLink.length > 0;
-        
+
         const textPdfFile = req.files?.textPdfFile;
         const visualPdfFile = req.files?.visualPdfFile;
         const statementsPdfFile = req.files?.statementsPdfFile;
@@ -176,7 +176,7 @@ async function createChapter(req, res) {
             const textPdfBuffer = textPdfFile.data;
             textPdfFilename = `${chapterId}_text${constants.FILE_EXTENSIONS.PDF}`;
             const textPdfPath = path.join(chapterDir, textPdfFilename);
-            
+
             // Parse and save text PDF
             textResult = await pdfParse(textPdfBuffer);
             await fsPromises.writeFile(textPdfPath, textPdfBuffer);
@@ -185,8 +185,8 @@ async function createChapter(req, res) {
         // Process visual PDF and statements only if video_link is not provided
         if (!hasVideoLink) {
             if (!visualPdfFile) {
-                return res.status(400).json({ 
-                    error: 'Visual PDF file is required when video_link is not provided' 
+                return res.status(400).json({
+                    error: 'Visual PDF file is required when video_link is not provided'
                 });
             }
 
@@ -195,7 +195,7 @@ async function createChapter(req, res) {
             // File paths
             visualPdfFilename = `${chapterId}_visual${constants.FILE_EXTENSIONS.PDF}`;
             statementsPdfFilename = statementsPdfFile ? `${chapterId}_statements${constants.FILE_EXTENSIONS.PDF}` : null;
-            
+
             const visualPdfPath = path.join(chapterDir, visualPdfFilename);
             const statementsPdfPath = statementsPdfFilename ? path.join(chapterDir, statementsPdfFilename) : null;
 
@@ -352,7 +352,7 @@ async function createChapter(req, res) {
 async function getChapters(req, res) {
     try {
         const { courseId } = req.params;
-        
+
         // Verify course exists
         const course = await dbUtils.getCourseById(courseId);
         if (!course) {
@@ -411,8 +411,8 @@ async function getChapterFile(req, res) {
 
         // If chapter has video_link but no PDF files, return error
         if (chapter.videoLink && !chapter.visualFilename && !chapter.textFilename) {
-            return res.status(400).json({ 
-                error: 'This chapter uses a video link and does not have PDF files. Use the video_link field instead.' 
+            return res.status(400).json({
+                error: 'This chapter uses a video link and does not have PDF files. Use the video_link field instead.'
             });
         }
 
@@ -509,7 +509,7 @@ async function summarizeChapter(req, res) {
         let summary = null;
 
         const summaryLanguage = language || 'fr';
-        
+
         const hasCachedSummary = chapter.summary && chapter.summaryLanguage === summaryLanguage;
         const hasCachedAudio = await fileUtils.audioFileExists(summaryAudioId);
 
@@ -519,7 +519,7 @@ async function summarizeChapter(req, res) {
             wavBuffer = await fileUtils.readAudioFile(summaryAudioId);
         } else {
             const text = chapter.textContent || null;
-            
+
             if (!text) {
                 return res.status(404).json({ error: 'Chapter content not found' });
             }
@@ -534,30 +534,39 @@ async function summarizeChapter(req, res) {
 
             if (!hasCachedAudio) {
                 console.log(`[Summary] Generating audio from summary for chapter ID: ${chapterId}`);
+
+                // Priority: Gemini TTS -> Edge TTS -> Local TTS
                 try {
-                    if (process.platform === 'win32') {
-                        wavBuffer = await localTTSService.generateTTSLocal(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
-                        console.log(`[Summary] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
-                    } else {
-                        throw new Error('Local TTS not available on this platform');
-                    }
-                } catch (localTtsError) {
-                    console.warn(`[Summary] Local TTS failed, trying Edge TTS:`, localTtsError.message);
+                    // 1. Try Gemini TTS (User Priority)
+                    console.log(`[Summary] Attempting Gemini TTS...`);
+                    const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+                    wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+                    console.log(`[Summary] Generated audio using Gemini TTS`);
+                } catch (geminiError) {
+                    console.warn(`[Summary] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
+
+                    // 2. Try Edge TTS (Fallback)
                     try {
                         const edgeTTSService = require('../services/edgeTTSService');
                         wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
                         console.log(`[Summary] Generated audio using Edge TTS (${summaryLanguage})`);
                     } catch (edgeError) {
-                        console.warn(`[Summary] Edge TTS failed, trying Gemini TTS:`, edgeError.message);
+                        console.warn(`[Summary] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
+
+                        // 3. Try Local TTS (Last Resort)
                         try {
-                            const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-                            wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-                            console.log(`[Summary] Generated audio using Gemini TTS`);
-                        } catch (geminiError) {
-                            throw new Error(`All TTS services failed. Local: ${localTtsError.message}, Edge: ${edgeError.message}, Gemini: ${geminiError.message}`);
+                            if (process.platform === 'win32') {
+                                wavBuffer = await localTTSService.generateTTSLocal(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
+                                console.log(`[Summary] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
+                            } else {
+                                throw new Error('Local TTS not available on this platform');
+                            }
+                        } catch (localTtsError) {
+                            throw new Error(`All TTS services failed. Gemini: ${geminiError.message}, Edge: ${edgeError.message}, Local: ${localTtsError.message}`);
                         }
                     }
                 }
+
                 await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
                 console.log(`[Summary] Saved summary audio cache for chapter ID: ${chapterId}`);
             } else {
@@ -649,18 +658,31 @@ async function getChapterPageTimings(req, res) {
         }
 
         const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
-        const visualPdfPath = path.join(chapterDir, chapter.visualFilename);
+        const textPdfPath = path.join(chapterDir, chapter.textFilename);
 
-        if (!(await fileUtils.fileExists(visualPdfPath))) {
-            return res.status(404).json({ error: 'Chapter PDF not found' });
+        if (!(await fileUtils.fileExists(textPdfPath))) {
+            return res.status(404).json({ error: 'Chapter text PDF not found' });
         }
 
-        const visualPdfBuffer = await fsPromises.readFile(visualPdfPath);
-        const visualPdfData = await pdfParse(visualPdfBuffer);
-        const fullVisualText = visualPdfData.text || '';
+        const pdfBuffer = await fsPromises.readFile(textPdfPath);
+
+        // Try to parse the PDF - catch invalid PDF structure errors
+        let pdfData, fullPdfText;
+        try {
+            pdfData = await pdfParse(pdfBuffer);
+            fullPdfText = pdfData.text || '';
+            console.log(`[Page Timings] Using text PDF: ${chapter.textFilename}`);
+        } catch (pdfError) {
+            console.error(`[Page Timings] PDF parsing error for ${chapter.textFilename}:`, pdfError.message);
+            return res.status(400).json({
+                error: 'Invalid PDF structure',
+                details: `The text PDF file is corrupted or not a valid PDF format. Please re-upload the chapter with a valid text PDF.`,
+                filename: chapter.textFilename
+            });
+        }
 
         const nextSlideMarker = /next\s+slide/gi;
-        const hasSlideMarkers = nextSlideMarker.test(fullVisualText);
+        const hasSlideMarkers = nextSlideMarker.test(fullPdfText);
         const excludeFromCount = /titan\s+academy/gi;
 
         function countWordsExcluding(text) {
@@ -674,7 +696,7 @@ async function getChapterPageTimings(req, res) {
         let numPages = 1;
 
         if (hasSlideMarkers) {
-            const slideSegments = fullVisualText.split(nextSlideMarker);
+            const slideSegments = fullPdfText.split(nextSlideMarker);
             let currentPageNum = 1;
             slideSegments.forEach((segment) => {
                 const cleanedSegment = segment.trim();
@@ -692,7 +714,7 @@ async function getChapterPageTimings(req, res) {
         } else {
             if (pdfjsLib) {
                 try {
-                    const loadingTask = pdfjsLib.getDocument({ data: visualPdfBuffer });
+                    const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
                     const pdfDocument = await loadingTask.promise;
                     numPages = pdfDocument.numPages;
 
@@ -725,8 +747,8 @@ async function getChapterPageTimings(req, res) {
             }
 
             if (pageWordCounts.length === 0) {
-                numPages = visualPdfData.numpages || 1;
-                const textWithoutExcluded = fullVisualText.replace(excludeFromCount, ' ').trim();
+                numPages = pdfData.numpages || 1;
+                const textWithoutExcluded = fullPdfText.replace(excludeFromCount, ' ').trim();
                 const allWordsArray = textWithoutExcluded.split(/\s+/).filter(word => word.length > 0);
                 const totalWordsExcluded = allWordsArray.length;
                 const avgWordsPerPage = numPages > 0 ? Math.ceil(totalWordsExcluded / numPages) : 0;
@@ -826,7 +848,7 @@ async function getChapterStatements(req, res) {
 async function updateChapter(req, res) {
     try {
         const { courseId, chapterId } = req.params;
-        
+
         // Validate course exists
         const course = await dbUtils.getCourseById(courseId);
         if (!course) {
@@ -864,13 +886,13 @@ async function updateChapter(req, res) {
             try {
                 const url = new URL(videoLink);
                 if (!['http:', 'https:'].includes(url.protocol)) {
-                    return res.status(400).json({ 
-                        error: 'videoLink must be a valid HTTP or HTTPS URL' 
+                    return res.status(400).json({
+                        error: 'videoLink must be a valid HTTP or HTTPS URL'
                     });
                 }
             } catch (urlError) {
-                return res.status(400).json({ 
-                    error: 'videoLink must be a valid URL' 
+                return res.status(400).json({
+                    error: 'videoLink must be a valid URL'
                 });
             }
         }
@@ -916,7 +938,7 @@ async function updateChapter(req, res) {
             const textPdfBuffer = textPdfFile.data;
             textPdfFilename = `${chapterId}_text${constants.FILE_EXTENSIONS.PDF}`;
             const textPdfPath = path.join(chapterDir, textPdfFilename);
-            
+
             textResult = await pdfParse(textPdfBuffer);
             await fsPromises.writeFile(textPdfPath, textPdfBuffer);
             console.log(`[Chapter Update] Updated text PDF for chapter ${chapterId}`);
@@ -953,7 +975,7 @@ async function updateChapter(req, res) {
             const visualPdfBuffer = visualPdfFile.data;
             visualPdfFilename = `${chapterId}_visual${constants.FILE_EXTENSIONS.PDF}`;
             const visualPdfPath = path.join(chapterDir, visualPdfFilename);
-            
+
             visualResult = await pdfParse(visualPdfBuffer);
             await fsPromises.writeFile(visualPdfPath, visualPdfBuffer);
 
@@ -997,7 +1019,7 @@ async function updateChapter(req, res) {
             const statementsPdfBuffer = statementsPdfFile.data;
             statementsPdfFilename = `${chapterId}_statements${constants.FILE_EXTENSIONS.PDF}`;
             const statementsPdfPath = path.join(chapterDir, statementsPdfFilename);
-            
+
             statementsResult = await pdfParse(statementsPdfBuffer);
             await fsPromises.writeFile(statementsPdfPath, statementsPdfBuffer);
 
@@ -1047,7 +1069,7 @@ async function updateChapter(req, res) {
         if (chapterName !== undefined) updates.chapterName = chapterName;
         if (chapterDescription !== undefined) updates.chapterDescription = chapterDescription || null;
         if (videoLink !== undefined) updates.videoLink = videoLink || null;
-        
+
         // Update PDF-related fields if files were provided
         if (textPdfFile) {
             updates.textContent = textResult?.text || null;
@@ -1055,12 +1077,12 @@ async function updateChapter(req, res) {
             updates.textLength = textResult?.text?.length || 0;
             updates.numPagesText = textResult?.numpages || 0;
         }
-        
+
         if (visualPdfFile) {
             updates.visualFilename = visualPdfFilename;
             updates.numPagesVisual = visualResult?.numpages || 0;
         }
-        
+
         if (statementsPdfFile) {
             updates.statementsFilename = statementsPdfFilename;
             updates.statements = statements;
@@ -1101,7 +1123,7 @@ async function updateChapter(req, res) {
 async function deleteChapter(req, res) {
     try {
         const { courseId, chapterId } = req.params;
-        
+
         // First check if chapter exists in database
         const chapter = await dbUtils.getChapterById(courseId, chapterId);
         if (!chapter) {

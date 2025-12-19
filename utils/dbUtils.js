@@ -16,14 +16,14 @@ const db = require('../config/database');
  */
 async function createCourse(courseData) {
     const { id, courseName, courseDescription, courseImage } = courseData;
-    
+
     try {
         await db.query(
             `INSERT INTO courses (id, course_name, course_description, course_image) 
              VALUES (?, ?, ?, ?)`,
             [id, courseName, courseDescription || null, courseImage || null]
         );
-        
+
         console.log(`[DB] Course created successfully: ${id} - ${courseName}`);
         return await getCourseById(id);
     } catch (error) {
@@ -51,7 +51,7 @@ async function getAllCourses() {
          GROUP BY c.id
          ORDER BY c.created_at DESC`
     );
-    
+
     return courses.map(course => ({
         id: course.id,
         courseName: course.courseName,
@@ -81,13 +81,13 @@ async function getCourseById(courseId) {
          WHERE id = ?`,
         [courseId]
     );
-    
+
     if (courses.length === 0) {
         return null;
     }
-    
+
     const course = courses[0];
-    
+
     // Get chapters for this course
     const chapters = await db.query(
         `SELECT 
@@ -101,7 +101,7 @@ async function getCourseById(courseId) {
          ORDER BY created_at ASC`,
         [courseId]
     );
-    
+
     return {
         id: course.id,
         courseName: course.courseName,
@@ -128,33 +128,33 @@ async function getCourseById(courseId) {
 async function updateCourse(courseId, updates) {
     const fields = [];
     const values = [];
-    
+
     if (updates.courseName !== undefined) {
         fields.push('course_name = ?');
         values.push(updates.courseName);
     }
-    
+
     if (updates.courseDescription !== undefined) {
         fields.push('course_description = ?');
         values.push(updates.courseDescription || null);
     }
-    
+
     if (updates.courseImage !== undefined) {
         fields.push('course_image = ?');
         values.push(updates.courseImage || null);
     }
-    
+
     if (fields.length === 0) {
         return await getCourseById(courseId);
     }
-    
+
     values.push(courseId);
-    
+
     await db.query(
         `UPDATE courses SET ${fields.join(', ')} WHERE id = ?`,
         values
     );
-    
+
     return await getCourseById(courseId);
 }
 
@@ -195,7 +195,7 @@ async function createChapter(chapterData) {
         statementsCount,
         statements
     } = chapterData;
-    
+
     await db.query(
         `INSERT INTO chapters (
             id, course_id, chapter_name, chapter_description, video_link,
@@ -221,7 +221,7 @@ async function createChapter(chapterData) {
             statements ? JSON.stringify(statements) : null
         ]
     );
-    
+
     return await getChapterById(courseId, id);
 }
 
@@ -255,13 +255,13 @@ async function getChapterById(courseId, chapterId) {
          WHERE id = ? AND course_id = ?`,
         [chapterId, courseId]
     );
-    
+
     if (chapters.length === 0) {
         return null;
     }
-    
+
     const chapter = chapters[0];
-    
+
     // Parse statements JSON
     if (chapter.statements) {
         try {
@@ -272,11 +272,11 @@ async function getChapterById(courseId, chapterId) {
     } else {
         chapter.statements = [];
     }
-    
+
     // Get images for this chapter
     const images = await getChapterImages(chapterId);
     chapter.webpImages = images.map(img => img.image_path);
-    
+
     return chapter;
 }
 
@@ -302,7 +302,7 @@ async function getChaptersByCourseId(courseId) {
          ORDER BY created_at ASC`,
         [courseId]
     );
-    
+
     // Get images for each chapter
     const chaptersWithImages = await Promise.all(
         chapters.map(async (chapter) => {
@@ -314,7 +314,7 @@ async function getChaptersByCourseId(courseId) {
             };
         })
     );
-    
+
     return chaptersWithImages;
 }
 
@@ -328,80 +328,80 @@ async function getChaptersByCourseId(courseId) {
 async function updateChapter(courseId, chapterId, updates) {
     const fields = [];
     const values = [];
-    
+
     if (updates.chapterName !== undefined) {
         fields.push('chapter_name = ?');
         values.push(updates.chapterName);
     }
-    
+
     if (updates.chapterDescription !== undefined) {
         fields.push('chapter_description = ?');
         values.push(updates.chapterDescription || null);
     }
-    
+
     if (updates.videoLink !== undefined) {
         fields.push('video_link = ?');
         values.push(updates.videoLink || null);
     }
-    
+
     if (updates.textContent !== undefined) {
         fields.push('text_content = ?');
         values.push(updates.textContent || null);
     }
-    
+
     if (updates.textFilename !== undefined) {
         fields.push('text_filename = ?');
         values.push(updates.textFilename || null);
     }
-    
+
     if (updates.visualFilename !== undefined) {
         fields.push('visual_filename = ?');
         values.push(updates.visualFilename || null);
     }
-    
+
     if (updates.statementsFilename !== undefined) {
         fields.push('statements_filename = ?');
         values.push(updates.statementsFilename || null);
     }
-    
+
     if (updates.textLength !== undefined) {
         fields.push('text_length = ?');
         values.push(updates.textLength || 0);
     }
-    
+
     if (updates.numPagesText !== undefined) {
         fields.push('num_pages_text = ?');
         values.push(updates.numPagesText || 0);
     }
-    
+
     if (updates.numPagesVisual !== undefined) {
         fields.push('num_pages_visual = ?');
         values.push(updates.numPagesVisual || 0);
     }
-    
+
     if (updates.numPagesStatements !== undefined) {
         fields.push('num_pages_statements = ?');
         values.push(updates.numPagesStatements || 0);
     }
-    
+
     if (updates.statements !== undefined) {
         fields.push('statements = ?');
         fields.push('statements_count = ?');
         values.push(updates.statements ? JSON.stringify(updates.statements) : null);
         values.push(updates.statements ? updates.statements.length : 0);
     }
-    
+
     if (fields.length === 0) {
         return await getChapterById(courseId, chapterId);
     }
-    
+
     values.push(chapterId, courseId);
-    
+
     await db.query(
         `UPDATE chapters SET ${fields.join(', ')} WHERE id = ? AND course_id = ?`,
         values
     );
-    
+
     return await getChapterById(courseId, chapterId);
 }
 
@@ -417,6 +417,25 @@ async function deleteChapter(courseId, chapterId) {
         [chapterId, courseId]
     );
     return result.affectedRows > 0;
+}
+
+/**
+ * Get chapter text content by ID (without needing courseId)
+ * Useful for TTS where we only have the docId/chapterId
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<string | null>} Chapter text or null if not found
+ */
+async function getChapterTextById(chapterId) {
+    const chapters = await db.query(
+        'SELECT text_content FROM chapters WHERE id = ?',
+        [chapterId]
+    );
+
+    if (chapters.length === 0) {
+        return null;
+    }
+
+    return chapters[0].text_content;
 }
 
 /**
@@ -438,14 +457,14 @@ async function addChapterImage(chapterId, imageData) {
         width,
         height
     } = imageData;
-    
+
     await db.query(
         `INSERT INTO chapter_images (
             chapter_id, image_path, page_number, image_type, file_size, width, height
         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [chapterId, imagePath, pageNumber || null, imageType, fileSize || null, width || null, height || null]
     );
-    
+
     const images = await getChapterImages(chapterId);
     return images[images.length - 1];
 }
@@ -505,14 +524,14 @@ async function deleteChapterImage(imageId) {
  */
 async function createLab(labData) {
     const { id, courseId, labName, labDescription, labType } = labData;
-    
+
     try {
         await db.query(
             `INSERT INTO labs (id, course_id, lab_name, lab_description, lab_type) 
              VALUES (?, ?, ?, ?, ?)`,
             [id, courseId, labName, labDescription || null, labType]
         );
-        
+
         console.log(`[DB] Lab created successfully: ${id} - ${labName}`);
         return await getLabById(id);
     } catch (error) {
@@ -543,7 +562,7 @@ async function getAllLabs() {
          GROUP BY l.id
          ORDER BY l.created_at DESC`
     );
-    
+
     return labs.map(lab => ({
         id: lab.id,
         courseId: lab.courseId,
@@ -578,11 +597,11 @@ async function getLabById(labId) {
          WHERE l.id = ?`,
         [labId]
     );
-    
+
     if (labs.length === 0) {
         return null;
     }
-    
+
     return labs[0];
 }
 
@@ -609,7 +628,7 @@ async function getLabsByCourseId(courseId) {
          ORDER BY l.created_at DESC`,
         [courseId]
     );
-    
+
     return labs.map(lab => ({
         id: lab.id,
         courseId: lab.courseId,
@@ -631,7 +650,7 @@ async function getLabsByCourseId(courseId) {
 async function updateLab(labId, updates) {
     const fields = [];
     const values = [];
-    
+
     if (updates.labName !== undefined) {
         fields.push('lab_name = ?');
         values.push(updates.labName);
@@ -648,18 +667,18 @@ async function updateLab(labId, updates) {
         fields.push('course_id = ?');
         values.push(updates.courseId);
     }
-    
+
     if (fields.length === 0) {
         return await getLabById(labId);
     }
-    
+
     values.push(labId);
-    
+
     await db.query(
         `UPDATE labs SET ${fields.join(', ')} WHERE id = ?`,
         values
     );
-    
+
     return await getLabById(labId);
 }
 
@@ -684,14 +703,14 @@ async function deleteLab(labId) {
  */
 async function createExercise(exerciseData) {
     const { id, labId, exerciseName, exerciseDescription, pdfResource } = exerciseData;
-    
+
     try {
         await db.query(
             `INSERT INTO exercises (id, lab_id, exercise_name, exercise_description, pdf_resource) 
              VALUES (?, ?, ?, ?, ?)`,
             [id, labId, exerciseName, exerciseDescription || null, pdfResource || null]
         );
-        
+
         console.log(`[DB] Exercise created successfully: ${id} - ${exerciseName}`);
         return await getExerciseById(id);
     } catch (error) {
@@ -721,11 +740,11 @@ async function getExerciseById(exerciseId) {
          WHERE e.id = ?`,
         [exerciseId]
     );
-    
+
     if (exercises.length === 0) {
         return null;
     }
-    
+
     return exercises[0];
 }
 
@@ -749,9 +768,9 @@ async function getExercisesByLabId(labId) {
          ORDER BY created_at ASC`,
         [labId]
     );
-    
+
     console.log(`[DB] Found ${exercises.length} exercises for lab ${labId}`);
-    
+
     return exercises;
 }
 
@@ -764,7 +783,7 @@ async function getExercisesByLabId(labId) {
 async function updateExercise(exerciseId, updates) {
     const fields = [];
     const values = [];
-    
+
     if (updates.exerciseName !== undefined) {
         fields.push('exercise_name = ?');
         values.push(updates.exerciseName);
@@ -781,18 +800,18 @@ async function updateExercise(exerciseId, updates) {
         fields.push('lab_id = ?');
         values.push(updates.labId);
     }
-    
+
     if (fields.length === 0) {
         return await getExerciseById(exerciseId);
     }
-    
+
     values.push(exerciseId);
-    
+
     await db.query(
         `UPDATE exercises SET ${fields.join(', ')} WHERE id = ?`,
         values
     );
-    
+
     return await getExerciseById(exerciseId);
 }
 
@@ -813,20 +832,21 @@ module.exports = {
     getCourseById,
     updateCourse,
     deleteCourse,
-    
+
     // Chapter operations
     createChapter,
     getChapterById,
     getChaptersByCourseId,
     updateChapter,
     deleteChapter,
-    
+    getChapterTextById,
+
     // Image operations
     addChapterImage,
     getChapterImages,
     deleteChapterImages,
     deleteChapterImage,
-    
+
     // Lab operations
     createLab,
     getAllLabs,
@@ -834,7 +854,7 @@ module.exports = {
     getLabsByCourseId,
     updateLab,
     deleteLab,
-    
+
     // Exercise operations
     createExercise,
     getExerciseById,

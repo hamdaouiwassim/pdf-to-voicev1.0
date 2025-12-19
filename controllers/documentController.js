@@ -139,7 +139,7 @@ async function createDocument(req, res) {
         const textPdfFilename = `${docId}_text${constants.FILE_EXTENSIONS.PDF}`;
         const visualPdfFilename = `${docId}_visual${constants.FILE_EXTENSIONS.PDF}`;
         const statementsPdfFilename = statementsPdfFile ? `${docId}_statements${constants.FILE_EXTENSIONS.PDF}` : null;
-        
+
         const textPdfPath = path.join(config.UPLOADS_DIR, textPdfFilename);
         const visualPdfPath = path.join(config.UPLOADS_DIR, visualPdfFilename);
         const statementsPdfPath = statementsPdfFilename ? path.join(config.UPLOADS_DIR, statementsPdfFilename) : null;
@@ -256,9 +256,9 @@ async function createDocument(req, res) {
         });
     } catch (err) {
         console.error("Error parsing PDF:", err.message);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to parse PDF. The file may be corrupted or invalid.",
-            details: err.message 
+            details: err.message
         });
     }
 }
@@ -274,9 +274,9 @@ async function getAllDocuments(req, res) {
         res.json(documents);
     } catch (error) {
         console.error("[FS Error] Failed to list documents:", error.message);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to list documents from file system.',
-            details: error.message 
+            details: error.message
         });
     }
 }
@@ -332,9 +332,9 @@ async function getDocumentFile(req, res) {
         res.sendFile(path.resolve(pdfFilePath));
     } catch (error) {
         console.error("[Document File Error]:", error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to retrieve document file.',
-            details: error.message 
+            details: error.message
         });
     }
 }
@@ -361,7 +361,7 @@ async function summarizeDocument(req, res) {
 
         // Default to French for summaries
         const summaryLanguage = language || 'fr';
-        
+
         // Check for cached summary text and audio
         const hasCachedSummary = metadata.summary && metadata.summaryLanguage === summaryLanguage;
         const hasCachedAudio = await fileUtils.audioFileExists(summaryAudioId);
@@ -373,7 +373,7 @@ async function summarizeDocument(req, res) {
         } else {
             // Get document text for summary generation
             const text = metadata.text || await fileUtils.getAITextByDocId(docId);
-            
+
             if (!text) {
                 return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
             }
@@ -389,37 +389,40 @@ async function summarizeDocument(req, res) {
             await fileUtils.saveDocumentMetadata(metadata);
 
             // Generate audio if not cached (use French voice)
-            // Priority: Local TTS (offline) > Edge TTS > Gemini TTS
+            // Priority: Gemini TTS -> Edge TTS -> Local TTS
             if (!hasCachedAudio) {
                 console.log(`[Summary] Generating audio from summary for doc ID: ${docId}`);
+
                 try {
-                    // Try local TTS first (works offline, good for localhost)
-                    if (process.platform === 'win32') {
-                        wavBuffer = await localTTSService.generateTTSLocal(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
-                        console.log(`[Summary] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
-                    } else {
-                        throw new Error('Local TTS not available on this platform');
-                    }
-                } catch (localTtsError) {
-                    console.warn(`[Summary] Local TTS failed, trying Edge TTS:`, localTtsError.message);
+                    // 1. Try Gemini TTS
+                    const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+                    wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+                    console.log(`[Summary] Generated audio using Gemini TTS`);
+                } catch (geminiError) {
+                    console.warn(`[Summary] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
+
+                    // 2. Try Edge TTS
                     try {
-                        // Try Edge TTS for better French voice quality
                         const edgeTTSService = require('../services/edgeTTSService');
                         wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
                         console.log(`[Summary] Generated audio using Edge TTS (${summaryLanguage})`);
                     } catch (edgeError) {
-                        console.warn(`[Summary] Edge TTS failed, trying Gemini TTS:`, edgeError.message);
-                        // Fallback to Gemini TTS
+                        console.warn(`[Summary] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
+
+                        // 3. Try Local TTS
                         try {
-                            const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-                            wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-                            console.log(`[Summary] Generated audio using Gemini TTS`);
-                        } catch (geminiError) {
-                            // If all fail, throw error
-                            throw new Error(`All TTS services failed. Local: ${localTtsError.message}, Edge: ${edgeError.message}, Gemini: ${geminiError.message}`);
+                            if (process.platform === 'win32') {
+                                wavBuffer = await localTTSService.generateTTSLocal(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
+                                console.log(`[Summary] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
+                            } else {
+                                throw new Error('Local TTS not available on this platform');
+                            }
+                        } catch (localTtsError) {
+                            throw new Error(`All TTS services failed. Gemini: ${geminiError.message}, Edge: ${edgeError.message}, Local: ${localTtsError.message}`);
                         }
                     }
                 }
+
                 await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
                 console.log(`[Summary] Saved summary audio cache for doc ID: ${docId}`);
             } else {
@@ -439,9 +442,9 @@ async function summarizeDocument(req, res) {
         });
     } catch (error) {
         console.error("[Summary Error]:", error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to generate summary and audio.',
-            details: error.message 
+            details: error.message
         });
     }
 }
@@ -464,12 +467,12 @@ async function generateSummaryAudio(req, res) {
 
         // Default to French for summaries
         const summaryLanguage = language || 'fr';
-        
+
         // Check if we have cached audio that matches the requested language
         const summaryAudioId = `${docId}${constants.AUDIO_PREFIXES.SUMMARY}`;
         const hasCachedAudio = await fileUtils.audioFileExists(summaryAudioId);
         const cachedAudioLanguageMatches = metadata.summaryLanguage === summaryLanguage;
-        
+
         // Only serve cached audio if it matches the requested language
         if (hasCachedAudio && cachedAudioLanguageMatches && metadata.summary) {
             console.log(`[Summary Audio] Serving cached audio for doc ID: ${docId} (language: ${summaryLanguage})`);
@@ -488,7 +491,7 @@ async function generateSummaryAudio(req, res) {
         if (!text) {
             return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
         }
-        
+
         // Generate summary (use cached if available and same language)
         let summary = metadata.summary && metadata.summaryLanguage === summaryLanguage
             ? metadata.summary
@@ -503,40 +506,42 @@ async function generateSummaryAudio(req, res) {
         }
 
         // Generate TTS audio from summary (regenerate if language mismatch or not cached)
-        // Priority: Local TTS (offline) > Edge TTS > Gemini TTS
+        // Generate TTS audio from summary (regenerate if language mismatch or not cached)
+        // Priority: Gemini TTS -> Edge TTS -> Local TTS
         let wavBuffer;
-        const ttsLanguage = summaryLanguage === 'fr' ? 'fr-FR' : 
-                           summaryLanguage === 'en' ? 'en-US' : 
-                           summaryLanguage === 'es' ? 'es-ES' :
-                           summaryLanguage === 'de' ? 'de-DE' :
-                           summaryLanguage === 'it' ? 'it-IT' :
-                           summaryLanguage === 'pt' ? 'pt-BR' : 'fr-FR';
-        
+        const ttsLanguage = summaryLanguage === 'fr' ? 'fr-FR' :
+            summaryLanguage === 'en' ? 'en-US' :
+                summaryLanguage === 'es' ? 'es-ES' :
+                    summaryLanguage === 'de' ? 'de-DE' :
+                        summaryLanguage === 'it' ? 'it-IT' :
+                            summaryLanguage === 'pt' ? 'pt-BR' : 'fr-FR';
+
         try {
-            // Try local TTS first (works offline, good for localhost)
-            if (process.platform === 'win32') {
-                wavBuffer = await localTTSService.generateTTSLocal(summary, ttsLanguage);
-                console.log(`[Summary Audio] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
-            } else {
-                throw new Error('Local TTS not available on this platform');
-            }
-        } catch (localTtsError) {
-            console.warn(`[Summary Audio] Local TTS failed, trying Edge TTS:`, localTtsError.message);
+            // 1. Try Gemini TTS
+            const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+            wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+            console.log(`[Summary Audio] Generated audio using Gemini TTS`);
+        } catch (geminiError) {
+            console.warn(`[Summary Audio] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
+
+            // 2. Try Edge TTS
             try {
-                // Try Edge TTS for better voice quality
                 const edgeTTSService = require('../services/edgeTTSService');
                 wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, ttsLanguage);
                 console.log(`[Summary Audio] Generated audio using Edge TTS (${summaryLanguage})`);
             } catch (edgeError) {
-                console.warn(`[Summary Audio] Edge TTS failed, trying Gemini TTS:`, edgeError.message);
-                // Fallback to Gemini TTS
+                console.warn(`[Summary Audio] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
+
+                // 3. Try Local TTS
                 try {
-                    const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-                    wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-                    console.log(`[Summary Audio] Generated audio using Gemini TTS`);
-                } catch (geminiError) {
-                    // If all fail, throw error
-                    throw new Error(`All TTS services failed. Local: ${localTtsError.message}, Edge: ${edgeError.message}, Gemini: ${geminiError.message}`);
+                    if (process.platform === 'win32') {
+                        wavBuffer = await localTTSService.generateTTSLocal(summary, ttsLanguage);
+                        console.log(`[Summary Audio] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
+                    } else {
+                        throw new Error('Local TTS not available on this platform');
+                    }
+                } catch (localTtsError) {
+                    throw new Error(`All TTS services failed. Gemini: ${geminiError.message}, Edge: ${edgeError.message}, Local: ${localTtsError.message}`);
                 }
             }
         }
@@ -555,9 +560,9 @@ async function generateSummaryAudio(req, res) {
         });
     } catch (error) {
         console.error("[Summary Audio Error]:", error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to generate summary audio.',
-            details: error.message 
+            details: error.message
         });
     }
 }
@@ -578,44 +583,49 @@ async function getPageTimings(req, res) {
             return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
         }
 
-        // Use VISUAL PDF ONLY for word counting and page timings
-        // This ensures timings are based on what the user sees (presentation PDF)
-        // In dual mode: visualFilename = "{docId}_visual.pdf" (for counting words)
-        //              textFilename = "{docId}_text.pdf" (for TTS, NOT used here)
+        // Use TEXT PDF ONLY for word counting and page timings
+        // This ensures timings match the TTS audio content (generated from text PDF)
         // Support both new format (dual mode) and legacy format (backward compatibility)
-        let visualPdfPath;
-        
+        let textPdfPath;
+
         if (metadata.isDualMode && metadata.textFilename && metadata.visualFilename) {
-            // New format: dual PDF mode - use visual PDF ({docId}_visual.pdf) for counting
-            visualPdfPath = path.join(config.UPLOADS_DIR, metadata.visualFilename);
-            console.log(`[Page Timings] Using VISUAL PDF for word counting: ${metadata.visualFilename}`);
+            // New format: dual PDF mode - use text PDF
+            textPdfPath = path.join(config.UPLOADS_DIR, metadata.textFilename);
+            console.log(`[Page Timings] Using TEXT PDF: ${metadata.textFilename}`);
         } else {
             // Legacy format: single PDF (backward compatibility for old documents)
-            visualPdfPath = path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.PDF}`);
+            textPdfPath = path.join(config.UPLOADS_DIR, `${docId}${constants.FILE_EXTENSIONS.PDF}`);
         }
 
-   
-        // Check if files exist
-        if (!(await fileUtils.fileExists(visualPdfPath))) {
-            return res.status(404).json({ error: constants.ERROR_MESSAGES.DOC_NOT_FOUND });
+        // Check if file exists
+        if (!(await fileUtils.fileExists(textPdfPath))) {
+            return res.status(404).json({ error: 'Text PDF not found for page timings' });
         }
 
-        // Parse VISUAL PDF and extract text page by page (NOT the text PDF)
-        // This ensures word counts match what the user sees on screen
-        const visualPdfBuffer = await fsPromises.readFile(visualPdfPath);
-        
-        // Extract full text first to check for "next slide" markers
-        // Priority: "next slide" markers > PDF page extraction
-        const visualPdfData = await pdfParse(visualPdfBuffer);
-        const fullVisualText = visualPdfData.text || '';
-        
+        // Parse TEXT PDF and extract text page by page
+        const pdfBuffer = await fsPromises.readFile(textPdfPath);
+
+        // Try to parse the PDF - catch invalid PDF structure errors
+        let pdfData, fullPdfText;
+        try {
+            pdfData = await pdfParse(pdfBuffer);
+            fullPdfText = pdfData.text || '';
+        } catch (pdfError) {
+            console.error(`[Page Timings] PDF parsing error:`, pdfError.message);
+            return res.status(400).json({
+                error: 'Invalid PDF structure',
+                details: `The text PDF file is corrupted or not a valid PDF format. Please re-upload the document with a valid text PDF.`,
+                filename: metadata.textFilename || 'document PDF'
+            });
+        }
+
         // Check if text contains "next slide" markers to divide pages/slides
         const nextSlideMarker = /next\s+slide/gi;
-        const hasSlideMarkers = nextSlideMarker.test(fullVisualText);
-        
+        const hasSlideMarkers = nextSlideMarker.test(fullPdfText);
+
         // Text to exclude from word count (e.g., "Titan Academy")
         const excludeFromCount = /titan\s+academy/gi;
-        
+
         /**
          * Count words in text, excluding specified phrases
          * @param {string} text - Text to count words in
@@ -629,20 +639,20 @@ async function getPageTimings(req, res) {
             const words = cleanedText.trim().split(/\s+/).filter(word => word.length > 0);
             return words.length;
         }
-        
+
         let pageWordCounts = [];
         let numPages = 1;
-        
+
         if (hasSlideMarkers) {
             // Priority 1: Split text by "next slide" markers - each segment is a slide
             // This provides accurate slide division based on explicit markers
-            const slideSegments = fullVisualText.split(nextSlideMarker);
-            
+            const slideSegments = fullPdfText.split(nextSlideMarker);
+
             // Each segment represents content for one slide
             let currentPageNum = 1;
             slideSegments.forEach((segment) => {
                 const cleanedSegment = segment.trim();
-                
+
                 if (cleanedSegment.length > 0) {
                     // Count words excluding "Titan Academy" and "next slide" marker
                     const wordCount = countWordsExcluding(cleanedSegment);
@@ -654,7 +664,7 @@ async function getPageTimings(req, res) {
                     currentPageNum++;
                 }
             });
-            
+
             // Update numPages to match actual slide count
             numPages = pageWordCounts.length || 1;
             console.log(`[Page Timings] Found ${numPages} slides based on "next slide" markers`);
@@ -663,7 +673,7 @@ async function getPageTimings(req, res) {
             // Try to use pdfjs-dist for page-by-page extraction
             if (pdfjsLib) {
                 try {
-                    const loadingTask = pdfjsLib.getDocument({ data: visualPdfBuffer });
+                    const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
                     const pdfDocument = await loadingTask.promise;
                     numPages = pdfDocument.numPages;
 
@@ -678,16 +688,16 @@ async function getPageTimings(req, res) {
                                     .map(item => item.str)
                                     .join(' ')
                                     .trim();
-                                
+
                                 // Remove "next slide" if present (not counted in words)
                                 let cleanedText = pageText.replace(nextSlideMarker, ' ').trim();
-                                
+
                                 // Count words excluding "Titan Academy"
                                 const wordCount = countWordsExcluding(cleanedText);
-                                
+
                                 // Also remove "Titan Academy" from text for display
                                 cleanedText = cleanedText.replace(excludeFromCount, ' ').trim();
-                                
+
                                 return {
                                     page: pageNum,
                                     wordCount: wordCount,
@@ -703,19 +713,19 @@ async function getPageTimings(req, res) {
                     // Fallback continues below
                 }
             }
-            
+
             // Fallback: use estimated distribution based on PDF pages
             if (pageWordCounts.length === 0) {
-                numPages = visualPdfData.numpages || 1;
-                
+                numPages = pdfData.numpages || 1;
+
                 // Create page word counts (estimated distribution)
                 // Note: We need to exclude "Titan Academy" from the word count
                 // Split the full text by "Titan Academy" first to get accurate word counts
-                const textWithoutExcluded = fullVisualText.replace(excludeFromCount, ' ').trim();
+                const textWithoutExcluded = fullPdfText.replace(excludeFromCount, ' ').trim();
                 const allWordsArray = textWithoutExcluded.split(/\s+/).filter(word => word.length > 0);
                 const totalWordsExcluded = allWordsArray.length;
                 const avgWordsPerPage = numPages > 0 ? Math.ceil(totalWordsExcluded / numPages) : 0;
-                
+
                 for (let pageNum = 1; pageNum <= numPages; pageNum++) {
                     const startIndex = (pageNum - 1) * avgWordsPerPage;
                     const endIndex = pageNum === numPages ? totalWordsExcluded : pageNum * avgWordsPerPage;
@@ -743,7 +753,7 @@ async function getPageTimings(req, res) {
         // Generate page timings array (cumulative) based on actual word counts per page
         // Sort by page number to ensure correct order
         pageWordCounts.sort((a, b) => a.page - b.page);
-        
+
         const pageTimings = [];
         let cumulativeTime = 0;
 
@@ -751,11 +761,11 @@ async function getPageTimings(req, res) {
             const pageNum = pageData.page;
             const wordCount = pageData.wordCount;
             const pageText = pageData.text || '';
-            
+
             if (pageNum === 1) {
                 // First page starts at 0
-                pageTimings.push({ 
-                    page: 1, 
+                pageTimings.push({
+                    page: 1,
                     time: 0,  // Début de la page 1
                     wordCount: wordCount,
                     text: pageText
@@ -766,8 +776,8 @@ async function getPageTimings(req, res) {
             } else {
                 // Le temps retourné est le DÉBUT de cette page (= fin de la page précédente)
                 // On retourne cumulativeTime AVANT d'ajouter le temps de la page courante
-                pageTimings.push({ 
-                    page: pageNum, 
+                pageTimings.push({
+                    page: pageNum,
                     time: Math.round(cumulativeTime * 10) / 10, // Temps de début de cette page
                     wordCount: wordCount,
                     text: pageText
@@ -781,9 +791,9 @@ async function getPageTimings(req, res) {
         res.json(pageTimings);
     } catch (error) {
         console.error("[Page Timings Error]:", error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to calculate page timings.',
-            details: error.message 
+            details: error.message
         });
     }
 }
