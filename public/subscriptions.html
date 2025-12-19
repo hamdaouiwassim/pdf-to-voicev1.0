@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,8 +9,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .fade-in {
@@ -17,69 +25,82 @@
         }
     </style>
 </head>
+
 <body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
     <!-- Navbar -->
     <nav class="bg-white shadow-lg mb-8">
         <div class="container mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-6">
-                    <a href="/index.html" class="flex items-center gap-2 text-gray-800 hover:text-indigo-600 transition-colors">
+                    <a href="/index.html"
+                        class="flex items-center gap-2 text-gray-800 hover:text-indigo-600 transition-colors">
                         <i class="fas fa-graduation-cap text-red-500 text-2xl"></i>
                         <span class="text-xl font-bold">Titan Academy</span>
                     </a>
                     <div class="flex gap-4">
-                        <a href="/index.html" class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
+                        <a href="/index.html"
+                            class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
                             <i class="fas fa-book"></i>
                             Courses
                         </a>
-                        <a href="/users.html" class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
+                        <a href="/users.html"
+                            class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
                             <i class="fas fa-users"></i>
                             Users
                         </a>
-                        <a href="/subscriptions.html" class="px-4 py-2 text-indigo-600 bg-indigo-50 rounded-lg font-semibold flex items-center gap-2">
+                        <a href="/subscriptions.html"
+                            class="px-4 py-2 text-indigo-600 bg-indigo-50 rounded-lg font-semibold flex items-center gap-2">
                             <i class="fas fa-credit-card"></i>
                             Subscriptions
+                        </a>
+                        <a href="/labs.html"
+                            class="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-flask"></i>
+                            Labs
                         </a>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
                     <!-- User Dropdown -->
                     <div class="relative" id="userDropdownContainer">
-                        <button 
-                            id="userDropdownBtn"
-                            class="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-semibold">
+                        <button id="userDropdownBtn"
+                            class="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                            <div
+                                class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-semibold">
                                 <span id="userInitials">A</span>
                             </div>
                             <span id="userEmailNav" class="hidden md:inline text-sm font-medium"></span>
                             <i class="fas fa-chevron-down text-xs"></i>
                         </button>
-                        <div 
-                            id="userDropdownMenu" 
-                            class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-                        >
+                        <div id="userDropdownMenu"
+                            class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
                             <div class="px-4 py-2 border-b border-gray-200">
                                 <p class="text-sm font-semibold text-gray-800" id="dropdownUserName">User Name</p>
                                 <p class="text-xs text-gray-500" id="dropdownUserEmail">user@example.com</p>
                             </div>
-                            <a href="/index.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <a href="/index.html"
+                                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <i class="fas fa-book w-4"></i>
                                 Manage Courses
                             </a>
-                            <a href="/users.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <a href="/users.html"
+                                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <i class="fas fa-users w-4"></i>
                                 Manage Users
                             </a>
-                            <a href="/subscriptions.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <a href="/subscriptions.html"
+                                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <i class="fas fa-star w-4"></i>
                                 Manage Subscriptions
                             </a>
+                            <a href="/labs.html"
+                                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                                <i class="fas fa-flask w-4"></i>
+                                Manage Labs
+                            </a>
                             <div class="border-t border-gray-200 my-1"></div>
-                            <button 
-                                id="btnLogoutNav"
-                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                            >
+                            <button id="btnLogoutNav"
+                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                                 <i class="fas fa-sign-out-alt w-4"></i>
                                 Logout
                             </button>
@@ -107,10 +128,8 @@
                     <i class="fas fa-credit-card text-indigo-500 mr-3"></i>
                     All Subscriptions
                 </h2>
-                <button 
-                    id="btnAddSubscription" 
-                    class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all transform hover:scale-105 shadow-lg flex items-center"
-                >
+                <button id="btnAddSubscription"
+                    class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
                     <i class="fas fa-plus-circle mr-2"></i>
                     Add Subscription
                 </button>
@@ -134,7 +153,8 @@
     </div>
 
     <!-- Add/Edit Subscription Modal -->
-    <div id="subscriptionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="subscriptionModal"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                 <h3 id="subscriptionModalTitle" class="text-2xl font-semibold text-gray-800">Add New Subscription</h3>
@@ -149,25 +169,18 @@
                             <i class="fas fa-tag mr-2 text-indigo-500"></i>
                             Subscription Name <span class="text-red-500">*</span>
                         </label>
-                        <input
-                            type="text"
-                            id="inpSubscriptionName"
+                        <input type="text" id="inpSubscriptionName"
                             class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="e.g. Basic Plan, Premium Plan"
-                            required
-                        />
+                            placeholder="e.g. Basic Plan, Premium Plan" required />
                     </div>
                     <div>
                         <label for="inpSubscriptionDescription" class="block text-sm font-semibold text-gray-700 mb-2">
                             <i class="fas fa-align-left mr-2 text-indigo-500"></i>
                             Description
                         </label>
-                        <textarea
-                            id="inpSubscriptionDescription"
-                            rows="3"
+                        <textarea id="inpSubscriptionDescription" rows="3"
                             class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                            placeholder="Describe what this subscription includes..."
-                        ></textarea>
+                            placeholder="Describe what this subscription includes..."></textarea>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -175,59 +188,43 @@
                                 <i class="fas fa-dollar-sign mr-2 text-indigo-500"></i>
                                 Price
                             </label>
-                            <input
-                                type="number"
-                                id="inpSubscriptionPrice"
-                                step="0.01"
-                                min="0"
+                            <input type="number" id="inpSubscriptionPrice" step="0.01" min="0"
                                 class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0.00"
-                                value="0.00"
-                            />
+                                placeholder="0.00" value="0.00" />
                         </div>
                         <div>
                             <label for="inpSubscriptionDuration" class="block text-sm font-semibold text-gray-700 mb-2">
                                 <i class="fas fa-calendar-alt mr-2 text-indigo-500"></i>
                                 Duration (Days) <span class="text-red-500">*</span>
                             </label>
-                            <input
-                                type="number"
-                                id="inpSubscriptionDuration"
-                                min="1"
+                            <input type="number" id="inpSubscriptionDuration" min="1"
                                 class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="30"
-                                value="30"
-                                required
-                            />
+                                placeholder="30" value="30" required />
                         </div>
                     </div>
                     <div>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                id="chkSubscriptionActive"
-                                class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                checked
-                            />
+                            <input type="checkbox" id="chkSubscriptionActive"
+                                class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked />
                             <span class="text-sm font-semibold text-gray-700">Active Subscription</span>
                         </label>
-                        <p class="text-xs text-gray-500 mt-1 ml-7">Inactive subscriptions cannot be assigned to users</p>
+                        <p class="text-xs text-gray-500 mt-1 ml-7">Inactive subscriptions cannot be assigned to users
+                        </p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
                             <i class="fas fa-book mr-2 text-indigo-500"></i>
                             Linked Courses
                         </label>
-                        <div id="subscriptionCoursesList" class="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto bg-gray-50">
+                        <div id="subscriptionCoursesList"
+                            class="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto bg-gray-50">
                             <p class="text-sm text-gray-500 text-center">Loading courses...</p>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">Select courses that this subscription provides access to</p>
+                        <p class="text-xs text-gray-500 mt-1">Select courses that this subscription provides access to
+                        </p>
                     </div>
-                    <button 
-                        type="button" 
-                        id="btnSaveSubscription" 
-                        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                    <button type="button" id="btnSaveSubscription"
+                        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
                         <i class="fas fa-save mr-2"></i>
                         <span id="btnSaveSubscriptionText">Create Subscription</span>
                     </button>
@@ -238,7 +235,8 @@
     </div>
 
     <!-- Assign Subscription to User Modal -->
-    <div id="assignSubscriptionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="assignSubscriptionModal"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
             <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                 <h3 class="text-2xl font-semibold text-gray-800">Assign Subscription</h3>
@@ -260,11 +258,9 @@
                             <i class="fas fa-user mr-2 text-indigo-500"></i>
                             Select User <span class="text-red-500">*</span>
                         </label>
-                        <select
-                            id="selAssignUser"
+                        <select id="selAssignUser"
                             class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            required
-                        >
+                            required>
                             <option value="">-- Select User --</option>
                         </select>
                     </div>
@@ -273,19 +269,14 @@
                             <i class="fas fa-credit-card mr-2 text-indigo-500"></i>
                             Select Subscription <span class="text-red-500">*</span>
                         </label>
-                        <select
-                            id="selAssignSubscription"
+                        <select id="selAssignSubscription"
                             class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            required
-                        >
+                            required>
                             <option value="">-- Select Subscription --</option>
                         </select>
                     </div>
-                    <button 
-                        type="button" 
-                        id="btnAssignSubscription" 
-                        class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                    <button type="button" id="btnAssignSubscription"
+                        class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
                         <i class="fas fa-check mr-2"></i>
                         Assign Subscription
                     </button>
@@ -305,26 +296,26 @@
                     credentials: 'include'
                 });
                 const data = await response.json();
-                
+
                 if (data.authenticated) {
                     // Update user dropdown (support both {user:{...}} and flat fields)
                     const userEmail = data.user?.email || data.email || 'User';
                     const userName = data.user?.name || data.name || '';
                     const userRole = data.user?.role || data.role || 'user';
-                    
+
                     document.getElementById('userEmailNav').textContent = userEmail;
                     document.getElementById('dropdownUserEmail').textContent = userEmail;
                     document.getElementById('dropdownUserName').textContent = userName || userEmail;
-                    
+
                     // Set initials
-                    const initials = userName 
+                    const initials = userName
                         ? userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
                         : userEmail[0].toUpperCase();
                     document.getElementById('userInitials').textContent = initials;
-                    
+
                     // Show dropdown container
                     document.getElementById('userDropdownContainer').classList.remove('hidden');
-                    
+
                     return true;
                 } else {
                     window.location.href = '/login.html';
@@ -357,7 +348,7 @@
                     method: 'POST',
                     credentials: 'include'
                 });
-                
+
                 if (response.ok) {
                     window.location.href = '/login.html';
                 }
@@ -392,15 +383,15 @@
         async function renderSubscriptionCourses(selectedCourseIds = []) {
             const coursesListEl = document.getElementById('subscriptionCoursesList');
             coursesListEl.innerHTML = '<p class="text-sm text-gray-500 text-center">Loading courses...</p>';
-            
+
             try {
                 const courses = await loadCoursesForSubscription();
-                
+
                 if (courses.length === 0) {
                     coursesListEl.innerHTML = '<p class="text-sm text-gray-500 text-center">No courses available</p>';
                     return;
                 }
-                
+
                 coursesListEl.innerHTML = courses.map(course => `
                     <label class="flex items-center gap-2 p-2 hover:bg-gray-100 rounded cursor-pointer">
                         <input
@@ -461,7 +452,7 @@
         // Render Subscriptions Grid
         async function renderSubscriptions(subscriptions) {
             const gridEl = document.getElementById('subscriptionsGrid');
-            
+
             // Load courses for each subscription
             const subscriptionsWithCourses = await Promise.all(subscriptions.map(async (sub) => {
                 try {
@@ -474,15 +465,15 @@
                     return { ...sub, courses: [] };
                 }
             }));
-            
+
             gridEl.innerHTML = subscriptionsWithCourses.map(sub => {
                 const statusBadge = sub.isActive
                     ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>'
                     : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Inactive</span>';
 
                 const coursesCount = sub.courses ? sub.courses.length : 0;
-                const coursesList = sub.courses && sub.courses.length > 0 
-                    ? sub.courses.map(c => c.courseName || c.id).join(', ') 
+                const coursesList = sub.courses && sub.courses.length > 0
+                    ? sub.courses.map(c => c.courseName || c.id).join(', ')
                     : 'No courses linked';
 
                 return `
@@ -547,17 +538,17 @@
             currentEditingSubscriptionId = null;
             document.getElementById('subscriptionModalTitle').textContent = 'Add New Subscription';
             document.getElementById('btnSaveSubscriptionText').textContent = 'Create Subscription';
-            
+
             document.getElementById('inpSubscriptionName').value = '';
             document.getElementById('inpSubscriptionDescription').value = '';
             document.getElementById('inpSubscriptionPrice').value = '0.00';
             document.getElementById('inpSubscriptionDuration').value = '30';
             document.getElementById('chkSubscriptionActive').checked = true;
             document.getElementById('subscriptionResult').classList.add('hidden');
-            
+
             // Load and render courses
             await renderSubscriptionCourses([]);
-            
+
             document.getElementById('subscriptionModal').classList.remove('hidden');
         });
 
@@ -628,7 +619,7 @@
 
                 let response;
                 let subscriptionId;
-                
+
                 if (currentEditingSubscriptionId) {
                     subscriptionId = currentEditingSubscriptionId;
                     response = await fetch(`${API_BASE}/api/subscriptions/${subscriptionId}`, {
@@ -657,7 +648,7 @@
                         credentials: 'include',
                         body: JSON.stringify({ courseIds: selectedCourses })
                     });
-                    
+
                     if (!linkResponse.ok) {
                         const linkData = await linkResponse.json();
                         throw new Error(linkData.error || 'Failed to link courses to subscription');
@@ -719,21 +710,21 @@
         // Assign Subscription (from subscription table - takes subscriptionId)
         async function assignSubscription(subscriptionId) {
             currentAssigningSubscriptionId = subscriptionId;
-            
+
             try {
                 // Load subscription details and users
                 const [usersResponse, subscriptionResponse] = await Promise.all([
                     fetch(`${API_BASE}/api/users`, { credentials: 'include' }),
                     fetch(`${API_BASE}/api/subscriptions/${subscriptionId}`, { credentials: 'include' })
                 ]);
-                
+
                 if (!usersResponse.ok || !subscriptionResponse.ok) {
                     throw new Error('Failed to load data');
                 }
-                
+
                 const users = await usersResponse.json();
                 const subscription = await subscriptionResponse.json();
-                
+
                 // Filter users: only those NOT already actively subscribed to this subscriptionId
                 const now = new Date();
                 const availableUsers = [];
@@ -753,14 +744,14 @@
                         // ignore user on error
                     }
                 }));
-                
+
                 // Show user select, hide user info
                 document.getElementById('assignUserInfo').classList.add('hidden');
                 document.getElementById('assignUserSelect').classList.remove('hidden');
-                
+
                 // Clear userId from modal dataset
                 delete document.getElementById('assignSubscriptionModal').dataset.userId;
-                
+
                 // Populate user dropdown with available users only
                 const selectUserEl = document.getElementById('selAssignUser');
                 selectUserEl.innerHTML = '';
@@ -776,7 +767,7 @@
                     placeholder.value = '';
                     placeholder.textContent = '-- Select User --';
                     selectUserEl.appendChild(placeholder);
-                    
+
                     availableUsers.forEach(user => {
                         const option = document.createElement('option');
                         option.value = user.id;
@@ -784,7 +775,7 @@
                         selectUserEl.appendChild(option);
                     });
                 }
-                
+
                 // Preselect subscription and hide subscription selector (subscription already chosen)
                 const selectSubscriptionEl = document.getElementById('selAssignSubscription');
                 selectSubscriptionEl.innerHTML = '';
@@ -794,11 +785,11 @@
                 opt.textContent = `${subscription.name} ($${price.toFixed(2)} / ${subscription.durationDays} days)`;
                 opt.selected = true;
                 selectSubscriptionEl.appendChild(opt);
-                
+
                 // Hide subscription selector container since fixed
                 const subscriptionSelectContainer = selectSubscriptionEl.parentElement;
                 subscriptionSelectContainer.classList.add('hidden');
-                
+
                 document.getElementById('assignResult').classList.add('hidden');
                 document.getElementById('assignSubscriptionModal').classList.remove('hidden');
             } catch (error) {
@@ -812,13 +803,13 @@
             // Or from select element if opened from subscription table
             const modal = document.getElementById('assignSubscriptionModal');
             let userId = modal.dataset.userId;
-            
+
             // If no userId in dataset, try to get from select element (for subscription table flow)
             if (!userId) {
                 const selectUserEl = document.getElementById('selAssignUser');
                 userId = selectUserEl ? selectUserEl.value : null;
             }
-            
+
             const subscriptionId = document.getElementById('selAssignSubscription').value;
 
             if (!userId) {
@@ -866,11 +857,11 @@
             } catch (error) {
                 console.error('Error assigning subscription:', error);
                 resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
-                
+
                 // Check if error message contains details (from backend)
                 const errorMessage = error.message || 'Failed to assign subscription';
                 const hasDetails = errorMessage.includes('expires on') || errorMessage.includes('already has');
-                
+
                 resultDiv.innerHTML = `
                     <div class="flex items-start">
                         <i class="fas fa-exclamation-circle text-red-500 mr-2 mt-1"></i>
@@ -919,5 +910,5 @@
         });
     </script>
 </body>
-</html>
 
+</html>
