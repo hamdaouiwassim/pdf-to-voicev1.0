@@ -208,6 +208,96 @@ function getAudioFilePath(audioId) {
 }
 
 /**
+ * Get directory path for page-based audio files (for chapters)
+ * @param {string} chapterId - Chapter ID
+ * @returns {string} Directory path
+ */
+function getPageAudioDir(chapterId) {
+    return path.join(config.AUDIOS_DIR, chapterId);
+}
+
+/**
+ * Get absolute path to a page audio file
+ * @param {string} chapterId - Chapter ID
+ * @param {number} pageNumber - Page number (1-indexed)
+ * @returns {string} Full path to audio file
+ */
+function getPageAudioFilePath(chapterId, pageNumber) {
+    const pageDir = getPageAudioDir(chapterId);
+    const pageNumStr = String(pageNumber).padStart(2, '0'); // 01, 02, 03, etc.
+    return path.join(pageDir, `page_${pageNumStr}.wav`);
+}
+
+/**
+ * Check if a page audio file exists
+ * @param {string} chapterId - Chapter ID
+ * @param {number} pageNumber - Page number (1-indexed)
+ * @returns {Promise<boolean>}
+ */
+async function pageAudioFileExists(chapterId, pageNumber) {
+    const audioPath = getPageAudioFilePath(chapterId, pageNumber);
+    return await fileExists(audioPath);
+}
+
+/**
+ * Read a page audio file
+ * @param {string} chapterId - Chapter ID
+ * @param {number} pageNumber - Page number (1-indexed)
+ * @returns {Promise<Buffer>}
+ */
+async function readPageAudioFile(chapterId, pageNumber) {
+    const audioPath = getPageAudioFilePath(chapterId, pageNumber);
+    return await fsPromises.readFile(audioPath);
+}
+
+/**
+ * Save a page audio file
+ * @param {string} chapterId - Chapter ID
+ * @param {number} pageNumber - Page number (1-indexed)
+ * @param {Buffer} audioBuffer - Audio file buffer
+ * @returns {Promise<void>}
+ */
+async function savePageAudioFile(chapterId, pageNumber, audioBuffer) {
+    const pageDir = getPageAudioDir(chapterId);
+    // Ensure directory exists
+    await fsPromises.mkdir(pageDir, { recursive: true });
+    
+    const audioPath = getPageAudioFilePath(chapterId, pageNumber);
+    await fsPromises.writeFile(audioPath, audioBuffer);
+}
+
+/**
+ * Get duration of an audio file (WAV format)
+ * @param {Buffer} audioBuffer - WAV file buffer
+ * @returns {Promise<number>} Duration in seconds
+ */
+async function getAudioDuration(audioBuffer) {
+    // WAV file format: bytes 4-7 contain file size, bytes 24-27 contain sample rate
+    // bytes 28-31 contain byte rate, bytes 32-35 contain block align
+    // bytes 40-43 contain data chunk size
+    
+    // Simple calculation: data size / (sample rate * channels * bits per sample / 8)
+    // For standard WAV: sample rate is at offset 24, channels at 22, bits per sample at 34
+    
+    try {
+        const sampleRate = audioBuffer.readUInt32LE(24);
+        const numChannels = audioBuffer.readUInt16LE(22);
+        const bitsPerSample = audioBuffer.readUInt16LE(34);
+        const dataSize = audioBuffer.readUInt32LE(40);
+        
+        const bytesPerSample = (bitsPerSample / 8) * numChannels;
+        const duration = dataSize / (sampleRate * bytesPerSample);
+        
+        return Math.round(duration * 10) / 10; // Round to 1 decimal
+    } catch (error) {
+        console.warn('[Audio Duration] Failed to calculate duration, using fallback:', error.message);
+        // Fallback: estimate based on file size (rough estimate)
+        // Assume 16-bit mono 24kHz: ~48KB per second
+        return Math.round((audioBuffer.length / 48000) * 10) / 10;
+    }
+}
+
+/**
  * Get absolute path to a lip sync JSON file.
  * @param {string} docId
  * @returns {string}
@@ -592,5 +682,12 @@ module.exports = {
     saveChapterMetadata,
     getChapterText,
     deleteChapterAssets,
+    // Page audio functions
+    getPageAudioDir,
+    getPageAudioFilePath,
+    pageAudioFileExists,
+    readPageAudioFile,
+    savePageAudioFile,
+    getAudioDuration,
 };
 

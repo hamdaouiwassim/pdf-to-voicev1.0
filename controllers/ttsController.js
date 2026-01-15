@@ -3,6 +3,8 @@ const audioUtils = require('../utils/audioUtils');
 const dbUtils = require('../utils/dbUtils');
 const geminiService = require('../services/geminiService');
 const edgeTTSService = require('../services/edgeTTSService');
+const textUtils = require('../utils/textUtils');
+const pdfTextExtractor = require('../utils/pdfTextExtractor');
 const config = require('../config/config');
 
 /**
@@ -12,35 +14,61 @@ const config = require('../config/config');
 async function generateTTS(req, res) {
     try {
         // Document ID validation is handled by middleware (validateDocIdInBody)
-        const { docId } = req.body;
+        const { docId, courseId } = req.body; // Support courseId for chapters
 
-        // 1. DATA RETRIEVAL
-        // Try to get text from Database first (primary source for new data)
-        let text = await dbUtils.getChapterTextById(docId);
-        let source = 'database';
+        // 1. DATA RETRIEVAL - Use TEXT PDF extraction (same as page timings)
+        // This ensures perfect synchronization between timings and TTS audio
+        console.log(`[TTS] Extracting text from TEXT PDF for ${docId}${courseId ? ` (chapter in course ${courseId})` : ''}...`);
+        
+        let text;
+        let source = 'text_pdf_extraction';
 
-        // If not found in DB, try file system (backward compatibility for old JSONs)
-        if (!text) {
-            console.log(`[TTS] Text not found in DB for ${docId}, checking file system...`);
-            text = await fileUtils.getAITextByDocId(docId);
+        try {
+            // Extract text directly from TEXT PDF using same logic as page timings
+            // This guarantees perfect synchronization
+            text = await pdfTextExtractor.extractTextForTTSById(docId, courseId);
+            console.log(`[TTS] Extracted text from TEXT PDF, length: ${text.length} chars`);
+        } catch (extractionError) {
+            console.warn(`[TTS] Failed to extract from TEXT PDF (${extractionError.message}), falling back to DB/file system...`);
+            
+            // Fallback to original method (for backward compatibility)
+            text = await dbUtils.getChapterTextById(docId);
+            source = 'database';
 
-            if (text) {
-                source = 'file_document';
-            } else {
-                // Try as chapter from file system
-                text = await fileUtils.getChapterText(docId);
+            if (!text) {
+                console.log(`[TTS] Text not found in DB for ${docId}, checking file system...`);
+                text = await fileUtils.getAITextByDocId(docId);
+
                 if (text) {
-                    source = 'file_chapter';
+                    source = 'file_document';
+                } else {
+                    // Try as chapter from file system
+                    text = await fileUtils.getChapterText(docId);
+                    if (text) {
+                        source = 'file_chapter';
+                    }
                 }
             }
+
+            if (!text) {
+                console.error(`[TTS] No text found for ${docId} (checked TEXT PDF, DB and files)`);
+                return res.status(404).json({ 
+                    error: 'Document or chapter content not found',
+                    details: 'Could not extract text from TEXT PDF, and no text found in database or file system.'
+                });
+            }
+
+            // Clean fallback text (remove markers to match page timings)
+            text = textUtils.removeSlideMarkers(text);
+            console.log(`[TTS] Using fallback source: ${source}, cleaned length: ${text.length} chars`);
         }
 
-        if (!text) {
-            console.error(`[TTS] No text found for ${docId} (checked DB and files)`);
-            return res.status(404).json({ error: 'Document or chapter content not found' });
+        if (!text || text.trim().length === 0) {
+            return res.status(404).json({ error: 'No text content found for TTS generation' });
         }
 
-        console.log(`[TTS] Found text for ${docId} via ${source}, length: ${text.length} chars`);
+        // Text is already cleaned (no "next slide" or "Titan Academy")
+        // This matches exactly with page timings calculation
 
         // 2. CACHE CHECK
         // Check for cached audio (async)
@@ -67,51 +95,7 @@ async function generateTTS(req, res) {
         // Try Microsoft Edge TTS first (Free, High Quality)
         try {
             console.log(`[TTS] Attempting Edge TTS...`);
-            // Use correct voice based on detected language if possible, or config default
-            // For now using default (auto-detect English/local)
-            const audioBuffer = await edgeTTSService.generateTTSWithEdge(text);
-
-            // Edge TTS returns MP3/WAV buffer directly. 
-            // If we need to standardize to WAV 24kHz 16-bit mono for frontend compatibility:
-            // But usually the frontend plays whatever blob it gets. 
-            // Let's assume audioUtils can handle it or we pass it through.
-            // However, existing code expects PCM buffer for wav conversion.
-            // Edge TTS returns a ready-to-play buffer (mostly mp3).
-            // To match existing file structure (wav), we might need to convert or just save as is.
-            // The existing `saveAudioFile` saves as .wav extension. 
-
-            // Simplification: For now, lets use Gemini fallback structure if logic is complex, 
-            // BUT here we want to accept the buffer.
-            // We will decode the MP3/WAV to PCM if needed, OR just save the buffer if it's already WAV.
-            // EdgeTTS default output is usually mp3.
-
-            // Wait, previous implementation of `saveAudioFile` writes buffer directly.
-            // If we save MP3 content into a .wav file, browsers might complain or handle it.
-            // Ideally we should decode. 
-            // BUT, `audioUtils` has `pcmToWav`. 
-            // Let's rely on fallback to Gemini if Edge fails, OR just use Gemini if simple.
-
-            // RE-READING REQUIREMENT: User wants to fix 403.
-            // If I just implemented Edge TTS, I might introduce format issues (MP3 vs WAV).
-            // Let's look at `audioUtils`. 
-
-            // To be safe and compliant with existing frontend (which expects 'audio/wav'),
-            // I should stick to Gemini for now if I can't easily convert Edge MP3 to WAV.
-            // BUT the user explicitly asked for Edge TTS solution.
-
-            // Let's try to use Gemini as the backup, but if Edge works, we return that.
-            // If Edge returns MP3, we send mimeType 'audio/mpeg'.
-
-            // UPDATED STRATEGY: 
-            // Frontend likely uses `new Audio(blobUrl)`. It supports MP3.
-            // We can save the file as .wav but contain MP3 data (misleading extension but works often),
-            // OR better, update `saveAudioFile` to respect extension.
-            // For minimal risk: I'll use Gemini logic as primary if I am unsure about audio format,
-            // BUT the whole point was to avoid Gemini Quota.
-
-            // Let's use the buffer from Edge.
-            pcmBuffer = null; // Edge returns encoded audio, not PCM
-            // We will skip pcmToWav if we have encoded audio
+            // Generate audio with cleaned text (already has "next slide" and "Titan Academy" removed)
             const edgeAudio = await edgeTTSService.generateTTSWithEdge(text);
 
             // Save directly (it's likely MP3)

@@ -24,6 +24,12 @@ router.post('/:chapterId/lipsync', validation.validateDocId, chapterController.g
 // GET /api/courses/:courseId/chapters/:chapterId/page-timings - Get page timings for a chapter
 router.get('/:chapterId/page-timings', validation.validateDocId, chapterController.getChapterPageTimings);
 
+// POST /api/courses/:courseId/chapters/:chapterId/generate-page-audio - Generate TTS audio for all pages
+router.post('/:chapterId/generate-page-audio', validation.validateDocId, chapterController.generateChapterPageAudio);
+
+// GET /api/courses/:courseId/chapters/:chapterId/audio/:pageNumber - Get audio file for a specific page
+router.get('/:chapterId/audio/:pageNumber', validation.validateDocId, chapterController.getChapterPageAudio);
+
 // GET /api/courses/:courseId/chapters/:chapterId/statements - Get chapter statements
 router.get('/:chapterId/statements', validation.validateDocId, chapterController.getChapterStatements);
 

@@ -320,6 +320,19 @@ async function createChapter(req, res) {
             });
         }
 
+        // Generate page-based TTS audio in background (non-blocking)
+        // This ensures perfect synchronization between audio and slides
+        if (textResult && textResult.text) {
+            generatePageTTSForChapter(chapterId, textPdfFilename, courseId)
+                .then(() => {
+                    console.log(`[Chapter] Successfully generated page TTS for chapter ${chapterId}`);
+                })
+                .catch((error) => {
+                    console.error(`[Chapter] Failed to generate page TTS for chapter ${chapterId}:`, error.message);
+                    // Don't fail the chapter creation if TTS generation fails
+                });
+        }
+
         res.json({
             chapterId: chapter.id,
             courseId: chapter.courseId,
@@ -334,7 +347,8 @@ async function createChapter(req, res) {
             numPagesStatements: chapter.numPagesStatements,
             statementsCount: chapter.statementsCount,
             webpImages: chapter.webpImages,
-            createdAt: chapter.createdAt
+            createdAt: chapter.createdAt,
+            pageTTSGenerating: true // Indicate that TTS generation is in progress
         });
     } catch (error) {
         console.error("[Chapter Create Error]:", error);
@@ -780,23 +794,45 @@ async function getChapterPageTimings(req, res) {
             const wordCount = pageData.wordCount;
             const pageText = pageData.text || '';
 
+            // Try to get actual audio duration if page audio exists
+            let pageDuration = null;
+            let audioPath = null;
+            
+            try {
+                if (await fileUtils.pageAudioFileExists(chapterId, pageNum)) {
+                    const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNum);
+                    pageDuration = await fileUtils.getAudioDuration(audioBuffer);
+                    audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNum);
+                    console.log(`[Page Timings] Found audio for page ${pageNum}, duration: ${pageDuration}s`);
+                }
+            } catch (error) {
+                console.warn(`[Page Timings] Could not read audio for page ${pageNum}:`, error.message);
+            }
+
+            // Use actual duration if available, otherwise calculate from word count
+            const secondsForPage = pageDuration !== null ? pageDuration : (wordCount / wordsPerSecond);
+
             if (pageNum === 1) {
                 pageTimings.push({
                     page: 1,
                     time: 0,
                     wordCount: wordCount,
-                    text: pageText
+                    text: pageText,
+                    duration: pageDuration !== null ? pageDuration : Math.round(secondsForPage * 10) / 10,
+                    audioPath: audioPath,
+                    estimated: pageDuration === null
                 });
-                const secondsForPage = wordCount / wordsPerSecond;
                 cumulativeTime = secondsForPage;
             } else {
                 pageTimings.push({
                     page: pageNum,
                     time: Math.round(cumulativeTime * 10) / 10,
                     wordCount: wordCount,
-                    text: pageText
+                    text: pageText,
+                    duration: pageDuration !== null ? pageDuration : Math.round(secondsForPage * 10) / 10,
+                    audioPath: audioPath,
+                    estimated: pageDuration === null
                 });
-                const secondsForPage = wordCount / wordsPerSecond;
                 cumulativeTime += secondsForPage;
             }
         }
@@ -806,6 +842,241 @@ async function getChapterPageTimings(req, res) {
         console.error("[Chapter Page Timings Error]:", error);
         res.status(500).json({
             error: 'Failed to calculate page timings.',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Generate TTS audio for all pages in a chapter (background process)
+ * Uses the same extraction logic as page timings to ensure perfect synchronization
+ * @param {string} chapterId - Chapter ID
+ * @param {string} textPdfFilename - Text PDF filename
+ * @param {string} courseId - Course ID
+ */
+async function generatePageTTSForChapter(chapterId, textPdfFilename, courseId) {
+    try {
+        console.log(`[Chapter] Starting page TTS generation for chapter ${chapterId}...`);
+        
+        const pageTTSService = require('../services/pageTTSService');
+        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        const textPdfPath = path.join(chapterDir, textPdfFilename);
+
+        if (!(await fileUtils.fileExists(textPdfPath))) {
+            throw new Error(`Text PDF not found: ${textPdfPath}`);
+        }
+
+        // Read and parse PDF
+        const pdfBuffer = await fsPromises.readFile(textPdfPath);
+        let pdfData, fullPdfText;
+        try {
+            pdfData = await pdfParse(pdfBuffer);
+            fullPdfText = pdfData.text || '';
+        } catch (pdfError) {
+            throw new Error(`PDF parsing error: ${pdfError.message}`);
+        }
+
+        // Use same extraction logic as page timings
+        const nextSlideMarker = /next\s+slide/gi;
+        const hasSlideMarkers = nextSlideMarker.test(fullPdfText);
+        const excludeFromCount = /titan\s+academy/gi;
+
+        function countWordsExcluding(text) {
+            if (!text || typeof text !== 'string') return 0;
+            let cleanedText = text.replace(excludeFromCount, ' ');
+            const words = cleanedText.trim().split(/\s+/).filter(word => word.length > 0);
+            return words.length;
+        }
+
+        let pageWordCounts = [];
+        let numPages = 1;
+
+        if (hasSlideMarkers) {
+            // Split by "next slide" markers
+            const slideSegments = fullPdfText.split(nextSlideMarker);
+            let currentPageNum = 1;
+            slideSegments.forEach((segment) => {
+                const cleanedSegment = segment.trim();
+                if (cleanedSegment.length > 0) {
+                    const wordCount = countWordsExcluding(cleanedSegment);
+                    pageWordCounts.push({
+                        page: currentPageNum,
+                        wordCount: wordCount,
+                        text: cleanedSegment
+                    });
+                    currentPageNum++;
+                }
+            });
+            numPages = pageWordCounts.length || 1;
+        } else {
+            // Use PDF.js for page-by-page extraction
+            if (pdfjsLib) {
+                try {
+                    const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+                    const pdfDocument = await loadingTask.promise;
+                    numPages = pdfDocument.numPages;
+
+                    const pagePromises = [];
+                    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                        pagePromises.push(
+                            pdfDocument.getPage(pageNum).then(async (page) => {
+                                const textContent = await page.getTextContent();
+                                const pageText = textContent.items
+                                    .map(item => item.str)
+                                    .join(' ')
+                                    .trim();
+
+                                let cleanedText = pageText.replace(nextSlideMarker, ' ').trim();
+                                const wordCount = countWordsExcluding(cleanedText);
+                                cleanedText = cleanedText.replace(excludeFromCount, ' ').trim();
+
+                                return {
+                                    page: pageNum,
+                                    wordCount: wordCount,
+                                    text: cleanedText
+                                };
+                            })
+                        );
+                    }
+                    pageWordCounts = await Promise.all(pagePromises);
+                } catch (pdfjsError) {
+                    console.warn('[Page TTS] PDF.js extraction failed, using fallback:', pdfjsError.message);
+                    // Fallback continues below
+                }
+            }
+
+            // Fallback: use estimated distribution
+            if (pageWordCounts.length === 0) {
+                numPages = pdfData.numpages || 1;
+                const textWithoutExcluded = fullPdfText.replace(excludeFromCount, ' ').trim();
+                const allWordsArray = textWithoutExcluded.split(/\s+/).filter(word => word.length > 0);
+                const totalWordsExcluded = allWordsArray.length;
+                const avgWordsPerPage = numPages > 0 ? Math.ceil(totalWordsExcluded / numPages) : 0;
+
+                for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                    const startIndex = (pageNum - 1) * avgWordsPerPage;
+                    const endIndex = pageNum === numPages ? totalWordsExcluded : pageNum * avgWordsPerPage;
+                    const pageWords = allWordsArray.slice(startIndex, endIndex);
+                    const pageText = pageWords.join(' ');
+                    pageWordCounts.push({
+                        page: pageNum,
+                        wordCount: endIndex - startIndex,
+                        text: pageText
+                    });
+                }
+            }
+        }
+
+        // Sort by page number
+        pageWordCounts.sort((a, b) => a.page - b.page);
+
+        // Generate TTS for all pages
+        const results = await pageTTSService.generateAllPagesTTS(pageWordCounts, chapterId, 'fr-FR', 3);
+        
+        const successCount = results.filter(r => r.success).length;
+        console.log(`[Chapter] Generated TTS for ${successCount}/${pageWordCounts.length} pages in chapter ${chapterId}`);
+        
+        return results;
+    } catch (error) {
+        console.error(`[Chapter] Error generating page TTS for chapter ${chapterId}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Generate or regenerate TTS audio for all pages in a chapter
+ * POST /api/courses/:courseId/chapters/:chapterId/generate-page-audio
+ */
+async function generateChapterPageAudio(req, res) {
+    try {
+        const { courseId, chapterId } = req.params;
+        
+        // Validate chapter exists
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
+        if (!chapter) {
+            return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        if (!chapter.textFilename) {
+            return res.status(400).json({ 
+                error: 'Chapter text PDF not found',
+                details: 'Cannot generate page audio without text PDF'
+            });
+        }
+
+        // Generate TTS for all pages
+        console.log(`[Chapter] Manual TTS generation requested for chapter ${chapterId}`);
+        
+        // Run in background but return immediately
+        generatePageTTSForChapter(chapterId, chapter.textFilename, courseId)
+            .then((results) => {
+                const successCount = results.filter(r => r.success).length;
+                console.log(`[Chapter] Completed TTS generation for chapter ${chapterId}: ${successCount}/${results.length} pages`);
+            })
+            .catch((error) => {
+                console.error(`[Chapter] TTS generation failed for chapter ${chapterId}:`, error.message);
+            });
+
+        res.json({
+            message: 'Page TTS generation started',
+            chapterId: chapterId,
+            status: 'processing'
+        });
+    } catch (error) {
+        console.error("[Chapter Page Audio Generation Error]:", error);
+        res.status(500).json({
+            error: 'Failed to start page audio generation.',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Get audio file for a specific page
+ * GET /api/courses/:courseId/chapters/:chapterId/audio/:pageNumber
+ */
+async function getChapterPageAudio(req, res) {
+    try {
+        const { courseId, chapterId, pageNumber } = req.params;
+        
+        // Validate chapter exists
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
+        if (!chapter) {
+            return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        // Validate page number
+        const pageNum = parseInt(pageNumber, 10);
+        if (isNaN(pageNum) || pageNum < 1) {
+            return res.status(400).json({ error: 'Invalid page number' });
+        }
+
+        // Check if page audio exists
+        const fileUtils = require('../utils/fileUtils');
+        if (!(await fileUtils.pageAudioFileExists(chapterId, pageNum))) {
+            return res.status(404).json({ 
+                error: 'Page audio not found',
+                details: `Audio for page ${pageNum} has not been generated yet. Please generate TTS for this chapter first.`
+            });
+        }
+
+        // Read and return audio file
+        const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNum);
+        const duration = await fileUtils.getAudioDuration(audioBuffer);
+
+        // Determine MIME type (WAV or MP3)
+        // Check if it's MP3 (Edge TTS) or WAV (Gemini/Local TTS)
+        const isMP3 = audioBuffer[0] === 0x49 && audioBuffer[1] === 0x44 && audioBuffer[2] === 0x33; // ID3 tag
+        const mimeType = isMP3 ? 'audio/mpeg' : 'audio/wav';
+
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', audioBuffer.length);
+        res.setHeader('X-Audio-Duration', duration.toString());
+        res.send(audioBuffer);
+    } catch (error) {
+        console.error("[Chapter Page Audio Error]:", error);
+        res.status(500).json({
+            error: 'Failed to retrieve page audio.',
             details: error.message
         });
     }
@@ -1165,6 +1436,8 @@ module.exports = {
     summarizeChapter,
     generateChapterLipSync,
     getChapterPageTimings,
+    getChapterPageAudio,
+    generateChapterPageAudio,
     getChapterStatements,
     updateChapter,
     deleteChapter

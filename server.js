@@ -143,6 +143,7 @@ app.use(fileUpload());
 // --- API Routes ---
 // Authentication routes (public)
 app.use('/api/auth', authRoutes);
+console.log('✓ Auth routes registered: /api/auth/login, /api/auth/register, /api/auth/logout, /api/auth/status');
 
 // Maintain backward compatibility for /api/extract-text
 app.use('/api/documents', documentRoutes);

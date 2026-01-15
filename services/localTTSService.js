@@ -9,60 +9,20 @@ const fsPromises = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const textUtils = require('../utils/textUtils');
 
 const execAsync = promisify(exec);
 
 /**
  * Cleans text for TTS conversion by removing problematic characters
  * Preserves French accented characters (é, è, ê, ç, etc.)
+ * Now uses shared textUtils.cleanTextForTTS to ensure consistency
  * @param {string} text - Raw text to clean
  * @returns {string} Cleaned text optimized for TTS
  */
 function cleanTextForTTS(text) {
-    if (!text || typeof text !== 'string') {
-        return '';
-    }
-
-    let cleaned = text;
-
-    // Remove HTML tags and entities
-    cleaned = cleaned.replace(/<[^>]*>/g, ' ');
-    cleaned = cleaned.replace(/&nbsp;/g, ' ');
-    cleaned = cleaned.replace(/&amp;/g, ' et ');
-    cleaned = cleaned.replace(/&lt;/g, ' moins que ');
-    cleaned = cleaned.replace(/&gt;/g, ' plus que ');
-    cleaned = cleaned.replace(/&quot;/g, '"');
-    cleaned = cleaned.replace(/&#39;/g, "'");
-    cleaned = cleaned.replace(/&[a-z]+;/gi, ' ');
-
-    // Remove URLs
-    cleaned = cleaned.replace(/https?:\/\/[^\s]+/gi, 'lien web');
-    cleaned = cleaned.replace(/www\.[^\s]+/gi, 'lien web');
-
-    // Remove email addresses
-    cleaned = cleaned.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, 'adresse email');
-
-    // Replace problematic punctuation
-    cleaned = cleaned.replace(/[•·▪▫]/g, ' ');
-    cleaned = cleaned.replace(/[—–]/g, '-');
-    cleaned = cleaned.replace(/[""]/g, '"');
-    cleaned = cleaned.replace(/['']/g, "'");
-    cleaned = cleaned.replace(/[…]/g, '...');
-
-    // Normalize whitespace
-    cleaned = cleaned.replace(/\r\n/g, ' ');
-    cleaned = cleaned.replace(/\r/g, ' ');
-    cleaned = cleaned.replace(/\n/g, ' ');
-    cleaned = cleaned.replace(/\t/g, ' ');
-    cleaned = cleaned.replace(/\s+/g, ' ');
-    cleaned = cleaned.trim();
-
-    // Ensure text ends with punctuation
-    if (cleaned.length > 0 && !/[.!?]$/.test(cleaned)) {
-        cleaned += '.';
-    }
-
-    return cleaned.trim();
+    // Use shared utility function to ensure consistency with page timings
+    return textUtils.cleanTextForTTS(text);
 }
 
 /**
