@@ -27,20 +27,8 @@ const { requireAuth } = require('./middleware/auth');
 // Import controllers (for backward compatibility)
 const documentController = require('./controllers/documentController');
 
-// Import routes
-const documentRoutes = require('./routes/documentRoutes');
-const ttsRoutes = require('./routes/ttsRoutes');
-const qaRoutes = require('./routes/qaRoutes');
-const audioRoutes = require('./routes/audioRoutes');
-const labRoutes = require('./routes/labRoutes');
-const courseRoutes = require('./routes/courseRoutes');
-const chapterRoutes = require('./routes/chapterRoutes');
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const subscriptionRoutes = require('./routes/subscriptionRoutes');
-const labManagementRoutes = require('./routes/labManagementRoutes');
-const exerciseRoutes = require('./routes/exerciseRoutes');
-const courseLabRoutes = require('./routes/courseLabRoutes');
+// Import centralized routes
+const apiRoutes = require('./routes');
 
 // Initialize Express app
 const app = express();
@@ -138,68 +126,23 @@ app.use('/audios', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     next();
 }, express.static(config.AUDIOS_DIR));
-app.use(fileUpload());
+// File upload middleware - configured for all routes
+app.use(fileUpload({
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for all uploads
+    abortOnLimit: true,
+    createParentPath: true // Automatically create parent directories
+}));
 
 // --- API Routes ---
-// Authentication routes (public)
-app.use('/api/auth', authRoutes);
-console.log('✓ Auth routes registered: /api/auth/login, /api/auth/register, /api/auth/logout, /api/auth/status');
+// Use centralized routing system
+// All routes are organized in routes/index.js
+app.use('/api', apiRoutes);
 
-// Maintain backward compatibility for /api/extract-text
-app.use('/api/documents', documentRoutes);
-app.use('/api/tts', ttsRoutes);
-app.use('/api/qa', qaRoutes);
-app.use('/api/audio', audioRoutes);
-app.use('/api/lab', labRoutes);
-
-// Subscription routes (protected)
-app.use('/api/subscriptions', requireAuth, subscriptionRoutes);
-
-// Course routes (protected - require subscription)
-const { requireSubscription } = require('./middleware/subscription');
-const subscriptionController = require('./controllers/subscriptionController');
-
-// Course enrollment routes (before requireSubscription middleware)
-app.post('/api/courses/:courseId/enroll', requireAuth, subscriptionController.enrollInCourse);
-app.get('/api/courses/:courseId/subscriptions', requireAuth, subscriptionController.getSubscriptionsForCourse);
-app.get('/api/users/me/courses', requireAuth, subscriptionController.getUserEnrolledCourses);
-
-// Admin: Enroll user in course (bypasses subscription requirement)
-app.post('/api/users/:userId/enroll/:courseId', requireAuth, subscriptionController.adminEnrollUserInCourse);
-
-// Admin: Cancel user enrollment in course
-app.delete('/api/users/:userId/enroll/:courseId', requireAuth, subscriptionController.cancelUserEnrollment);
-
-// Course and Chapter routes (protected - require subscription and enrollment)
-app.use('/api/courses', requireAuth, requireSubscription, courseRoutes);
-app.use('/api/courses/:courseId/chapters', requireAuth, requireSubscription, chapterRoutes);
-
-// Lab management routes (protected - require auth)
-app.use('/api/labs', requireAuth, labManagementRoutes);
-
-// Course-specific labs route - use a more explicit handler
-app.get('/api/courses/:courseId/labs', requireAuth, (req, res, next) => {
-    // Create a new request object with courseId in params
-    req.params = req.params || {};
-    req.params.courseId = req.params.courseId;
-    // Call the controller directly
-    const labManagementController = require('./controllers/labManagementController');
-    return labManagementController.getLabsByCourse(req, res, next);
-});
-
-app.use('/api/exercises', requireAuth, exerciseRoutes);
-
-// User management routes (protected)
-app.use('/api/users', requireAuth, userRoutes);
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        version: require('./package.json').version
-    });
-});
+// Log registered routes
+console.log('✓ API Routes registered via centralized routing system');
+console.log('  - Public: /api/auth, /api/documents, /api/tts, /api/qa, /api/audio, /api/lab');
+console.log('  - Protected: /api/subscriptions, /api/courses, /api/labs, /api/exercises, /api/users');
+console.log('  - Health: /api/health');
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

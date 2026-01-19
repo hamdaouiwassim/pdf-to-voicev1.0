@@ -825,6 +825,492 @@ async function deleteExercise(exerciseId) {
     return result.affectedRows > 0;
 }
 
+/**
+ * Final Project Database Operations
+ */
+
+/**
+ * Create a new final project
+ * @param {Object} projectData - Final project data
+ * @returns {Promise<Object>} Created final project
+ */
+async function createFinalProject(projectData) {
+    const { id, courseId, projectName, projectDescription } = projectData;
+
+    try {
+        await db.query(
+            `INSERT INTO final_projects (id, course_id, project_name, project_description) 
+             VALUES (?, ?, ?, ?)`,
+            [id, courseId, projectName, projectDescription || null]
+        );
+
+        console.log(`[DB] Final project created: ${id} - ${projectName}`);
+        return await getFinalProjectById(id);
+    } catch (error) {
+        console.error('[DB] Error creating final project:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get final project by ID
+ * @param {string} projectId - Final project ID
+ * @returns {Promise<Object|null>} Final project or null
+ */
+async function getFinalProjectById(projectId) {
+    try {
+        const projects = await db.query(
+            `SELECT 
+                id,
+                course_id as courseId,
+                project_name as projectName,
+                project_description as projectDescription,
+                created_at as createdAt,
+                updated_at as updatedAt
+             FROM final_projects 
+             WHERE id = ?`,
+            [projectId]
+        );
+
+        if (projects.length === 0) {
+            return null;
+        }
+
+        return {
+            id: projects[0].id,
+            courseId: projects[0].courseId,
+            projectName: projects[0].projectName,
+            projectDescription: projects[0].projectDescription,
+            createdAt: projects[0].createdAt,
+            updatedAt: projects[0].updatedAt
+        };
+    } catch (error) {
+        console.error('[DB] Error getting final project:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get final project by course ID
+ * @param {string} courseId - Course ID
+ * @returns {Promise<Object|null>} Final project or null
+ */
+async function getFinalProjectByCourseId(courseId) {
+    try {
+        const projects = await db.query(
+            `SELECT 
+                id,
+                course_id as courseId,
+                project_name as projectName,
+                project_description as projectDescription,
+                created_at as createdAt,
+                updated_at as updatedAt
+             FROM final_projects 
+             WHERE course_id = ?`,
+            [courseId]
+        );
+
+        if (projects.length === 0) {
+            return null;
+        }
+
+        return {
+            id: projects[0].id,
+            courseId: projects[0].courseId,
+            projectName: projects[0].projectName,
+            projectDescription: projects[0].projectDescription,
+            createdAt: projects[0].createdAt,
+            updatedAt: projects[0].updatedAt
+        };
+    } catch (error) {
+        console.error('[DB] Error getting final project by course:', error);
+        throw error;
+    }
+}
+
+/**
+ * Update final project
+ * @param {string} projectId - Final project ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated final project
+ */
+async function updateFinalProject(projectId, updates) {
+    const fields = [];
+    const values = [];
+
+    if (updates.projectName !== undefined) {
+        fields.push('project_name = ?');
+        values.push(updates.projectName);
+    }
+    if (updates.projectDescription !== undefined) {
+        fields.push('project_description = ?');
+        values.push(updates.projectDescription);
+    }
+
+    if (fields.length === 0) {
+        return await getFinalProjectById(projectId);
+    }
+
+    values.push(projectId);
+
+    try {
+        await db.query(
+            `UPDATE final_projects 
+             SET ${fields.join(', ')} 
+             WHERE id = ?`,
+            values
+        );
+
+        return await getFinalProjectById(projectId);
+    } catch (error) {
+        console.error('[DB] Error updating final project:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete final project
+ * @param {string} projectId - Final project ID
+ * @returns {Promise<boolean>} True if deleted
+ */
+async function deleteFinalProject(projectId) {
+    try {
+        const result = await db.query(
+            `DELETE FROM final_projects WHERE id = ?`,
+            [projectId]
+        );
+
+        return result.affectedRows > 0;
+    } catch (error) {
+        console.error('[DB] Error deleting final project:', error);
+        throw error;
+    }
+}
+
+/**
+ * Create a final project document
+ * @param {Object} documentData - Document data
+ * @returns {Promise<Object>} Created document
+ */
+async function createFinalProjectDocument(documentData) {
+    const { id, finalProjectId, documentName, documentDescription, pdfResource } = documentData;
+
+    try {
+        await db.query(
+            `INSERT INTO final_project_documents (id, final_project_id, document_name, document_description, pdf_resource) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [id, finalProjectId, documentName, documentDescription || null, pdfResource || null]
+        );
+
+        return await getFinalProjectDocumentById(id);
+    } catch (error) {
+        console.error('[DB] Error creating final project document:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get final project document by ID
+ * @param {string} documentId - Document ID
+ * @returns {Promise<Object|null>} Document or null
+ */
+async function getFinalProjectDocumentById(documentId) {
+    try {
+        const documents = await db.query(
+            `SELECT 
+                id,
+                final_project_id as finalProjectId,
+                document_name as documentName,
+                document_description as documentDescription,
+                pdf_resource as pdfResource,
+                created_at as createdAt,
+                updated_at as updatedAt
+             FROM final_project_documents 
+             WHERE id = ?`,
+            [documentId]
+        );
+
+        if (documents.length === 0) {
+            return null;
+        }
+
+        return {
+            id: documents[0].id,
+            finalProjectId: documents[0].finalProjectId,
+            documentName: documents[0].documentName,
+            documentDescription: documents[0].documentDescription,
+            pdfResource: documents[0].pdfResource,
+            createdAt: documents[0].createdAt,
+            updatedAt: documents[0].updatedAt
+        };
+    } catch (error) {
+        console.error('[DB] Error getting final project document:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get all documents for a final project
+ * @param {string} finalProjectId - Final project ID
+ * @returns {Promise<Array>} Array of documents
+ */
+async function getFinalProjectDocuments(finalProjectId) {
+    try {
+        const documents = await db.query(
+            `SELECT 
+                id,
+                final_project_id as finalProjectId,
+                document_name as documentName,
+                document_description as documentDescription,
+                pdf_resource as pdfResource,
+                created_at as createdAt,
+                updated_at as updatedAt
+             FROM final_project_documents 
+             WHERE final_project_id = ?
+             ORDER BY created_at ASC`,
+            [finalProjectId]
+        );
+
+        return documents.map(doc => ({
+            id: doc.id,
+            finalProjectId: doc.finalProjectId,
+            documentName: doc.documentName,
+            documentDescription: doc.documentDescription,
+            pdfResource: doc.pdfResource,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt
+        }));
+    } catch (error) {
+        console.error('[DB] Error getting final project documents:', error);
+        throw error;
+    }
+}
+
+/**
+ * Update final project document
+ * @param {string} documentId - Document ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated document
+ */
+async function updateFinalProjectDocument(documentId, updates) {
+    const fields = [];
+    const values = [];
+
+    if (updates.documentName !== undefined) {
+        fields.push('document_name = ?');
+        values.push(updates.documentName);
+    }
+    if (updates.documentDescription !== undefined) {
+        fields.push('document_description = ?');
+        values.push(updates.documentDescription);
+    }
+    if (updates.pdfResource !== undefined) {
+        fields.push('pdf_resource = ?');
+        values.push(updates.pdfResource);
+    }
+
+    if (fields.length === 0) {
+        return await getFinalProjectDocumentById(documentId);
+    }
+
+    values.push(documentId);
+
+    try {
+        await db.query(
+            `UPDATE final_project_documents 
+             SET ${fields.join(', ')} 
+             WHERE id = ?`,
+            values
+        );
+
+        return await getFinalProjectDocumentById(documentId);
+    } catch (error) {
+        console.error('[DB] Error updating final project document:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete final project document
+ * @param {string} documentId - Document ID
+ * @returns {Promise<boolean>} True if deleted
+ */
+async function deleteFinalProjectDocument(documentId) {
+    try {
+        const result = await db.query(
+            `DELETE FROM final_project_documents WHERE id = ?`,
+            [documentId]
+        );
+
+        return result.affectedRows > 0;
+    } catch (error) {
+        console.error('[DB] Error deleting final project document:', error);
+        throw error;
+    }
+}
+
+/**
+ * Create final project submission
+ * @param {Object} submissionData - Submission data
+ * @returns {Promise<Object>} Created submission
+ */
+async function createFinalProjectSubmission(submissionData) {
+    try {
+        const { id, finalProjectId, userEmail, fileResource, comment } = submissionData;
+        
+        await db.query(
+            `INSERT INTO final_project_submissions (id, final_project_id, user_email, file_resource, comment) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [id, finalProjectId, userEmail, fileResource || null, comment || null]
+        );
+
+        return await getFinalProjectSubmissionById(id);
+    } catch (error) {
+        console.error('[DB] Error creating final project submission:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get final project submission by ID
+ * @param {string} submissionId - Submission ID
+ * @returns {Promise<Object|null>} Submission or null
+ */
+async function getFinalProjectSubmissionById(submissionId) {
+    try {
+        const submissions = await db.query(
+            `SELECT 
+                id,
+                final_project_id as finalProjectId,
+                user_email as userEmail,
+                file_resource as fileResource,
+                comment,
+                submitted_at as submittedAt,
+                updated_at as updatedAt
+             FROM final_project_submissions 
+             WHERE id = ?`,
+            [submissionId]
+        );
+
+        if (submissions.length === 0) {
+            return null;
+        }
+
+        return {
+            id: submissions[0].id,
+            finalProjectId: submissions[0].finalProjectId,
+            userEmail: submissions[0].userEmail,
+            fileResource: submissions[0].fileResource,
+            comment: submissions[0].comment,
+            submittedAt: submissions[0].submittedAt,
+            updatedAt: submissions[0].updatedAt
+        };
+    } catch (error) {
+        console.error('[DB] Error getting final project submission:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get final project submission by project ID and user email
+ * @param {string} finalProjectId - Final project ID
+ * @param {string} userEmail - User email
+ * @returns {Promise<Object|null>} Submission or null
+ */
+async function getFinalProjectSubmissionByUser(finalProjectId, userEmail) {
+    try {
+        const submissions = await db.query(
+            `SELECT 
+                id,
+                final_project_id as finalProjectId,
+                user_email as userEmail,
+                file_resource as fileResource,
+                comment,
+                submitted_at as submittedAt,
+                updated_at as updatedAt
+             FROM final_project_submissions 
+             WHERE final_project_id = ? AND user_email = ?`,
+            [finalProjectId, userEmail]
+        );
+
+        if (submissions.length === 0) {
+            return null;
+        }
+
+        return {
+            id: submissions[0].id,
+            finalProjectId: submissions[0].finalProjectId,
+            userEmail: submissions[0].userEmail,
+            fileResource: submissions[0].fileResource,
+            comment: submissions[0].comment,
+            submittedAt: submissions[0].submittedAt,
+            updatedAt: submissions[0].updatedAt
+        };
+    } catch (error) {
+        console.error('[DB] Error getting final project submission by user:', error);
+        throw error;
+    }
+}
+
+/**
+ * Update final project submission
+ * @param {string} submissionId - Submission ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated submission
+ */
+async function updateFinalProjectSubmission(submissionId, updates) {
+    const fields = [];
+    const values = [];
+
+    if (updates.fileResource !== undefined) {
+        fields.push('file_resource = ?');
+        values.push(updates.fileResource);
+    }
+    if (updates.comment !== undefined) {
+        fields.push('comment = ?');
+        values.push(updates.comment);
+    }
+
+    if (fields.length === 0) {
+        return await getFinalProjectSubmissionById(submissionId);
+    }
+
+    values.push(submissionId);
+
+    try {
+        await db.query(
+            `UPDATE final_project_submissions 
+             SET ${fields.join(', ')} 
+             WHERE id = ?`,
+            values
+        );
+
+        return await getFinalProjectSubmissionById(submissionId);
+    } catch (error) {
+        console.error('[DB] Error updating final project submission:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete final project submission
+ * @param {string} submissionId - Submission ID
+ * @returns {Promise<boolean>} True if deleted
+ */
+async function deleteFinalProjectSubmission(submissionId) {
+    try {
+        const result = await db.query(
+            `DELETE FROM final_project_submissions WHERE id = ?`,
+            [submissionId]
+        );
+
+        return result.affectedRows > 0;
+    } catch (error) {
+        console.error('[DB] Error deleting final project submission:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     // Course operations
     createCourse,
@@ -860,6 +1346,23 @@ module.exports = {
     getExerciseById,
     getExercisesByLabId,
     updateExercise,
-    deleteExercise
+    deleteExercise,
+
+    // Final Project operations
+    createFinalProject,
+    getFinalProjectById,
+    getFinalProjectByCourseId,
+    updateFinalProject,
+    deleteFinalProject,
+    createFinalProjectDocument,
+    getFinalProjectDocumentById,
+    getFinalProjectDocuments,
+    updateFinalProjectDocument,
+    deleteFinalProjectDocument,
+    createFinalProjectSubmission,
+    getFinalProjectSubmissionById,
+    getFinalProjectSubmissionByUser,
+    updateFinalProjectSubmission,
+    deleteFinalProjectSubmission
 };
 

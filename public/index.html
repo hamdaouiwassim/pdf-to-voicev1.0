@@ -202,11 +202,18 @@
                             <p id="courseDescriptionDisplay" class="text-sm text-gray-500 mt-1"></p>
                         </div>
                     </div>
-                    <button id="btnAddChapter"
-                        class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
-                        <i class="fas fa-plus-circle mr-2"></i>
-                        Add Chapter
-                    </button>
+                    <div class="flex gap-3">
+                        <button id="btnManageFinalProject"
+                            class="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
+                            <i class="fas fa-project-diagram mr-2"></i>
+                            <span id="btnManageFinalProjectText">Manage Final Project</span>
+                        </button>
+                        <button id="btnAddChapter"
+                            class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
+                            <i class="fas fa-plus-circle mr-2"></i>
+                            Add Chapter
+                        </button>
+                    </div>
                 </div>
 
                 <div id="chaptersLoading" class="text-center py-12 hidden">
@@ -447,11 +454,6 @@
                             <span><strong>Visual PDF:</strong> Required only when video link is not provided. Will be
                                 converted to WebP images.</span>
                         </p>
-                        <p class="text-sm text-blue-800 flex items-center gap-2">
-                            <i class="fas fa-lightbulb text-yellow-500"></i>
-                            <span><strong>Optional:</strong> You can add a third PDF containing exercise statements for
-                                the interactive lab.</span>
-                        </p>
                     </div>
 
                     <div class="space-y-4 mb-6">
@@ -510,17 +512,6 @@
                             <div id="visualFileName" class="mt-2 text-purple-600 font-medium text-sm hidden"></div>
                         </div>
 
-                        <div
-                            class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                            <input type="file" id="inpStatementsFile" accept=".pdf" class="hidden">
-                            <label for="inpStatementsFile" class="cursor-pointer">
-                                <i class="fas fa-tasks text-4xl text-pink-500 mb-2"></i>
-                                <p class="text-gray-700 font-medium mb-1">Exercise Statements PDF (optional)</p>
-                                <p class="text-sm text-gray-500">Each page can hold an exercise statement for the coding
-                                    lab.</p>
-                            </label>
-                            <div id="statementsFileName" class="mt-2 text-pink-500 font-medium text-sm hidden"></div>
-                        </div>
                     </div>
 
                     <button type="button" id="btnUploadChapter"
@@ -573,6 +564,168 @@
             </div>
         </div>
 
+        <!-- Final Project Management Modal -->
+        <div id="finalProjectModal"
+            class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                    <h3 id="finalProjectModalTitle" class="text-2xl font-semibold text-gray-800">Final Project Management</h3>
+                    <button id="closeFinalProjectModal" class="text-gray-400 hover:text-gray-600 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <!-- Final Project Info Section -->
+                    <div id="finalProjectInfoSection" class="mb-6">
+                        <div id="noFinalProjectState" class="hidden">
+                            <p class="text-gray-600 mb-4">No final project exists for this course. Create one to add documents.</p>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Project Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" id="inpProjectName" maxlength="255"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        placeholder="Enter project name">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Project Description
+                                    </label>
+                                    <textarea id="inpProjectDescription" rows="3" maxlength="2000"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        placeholder="Enter project description"></textarea>
+                                </div>
+                                <button id="btnCreateFinalProject"
+                                    class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
+                                    Create Final Project
+                                </button>
+                            </div>
+                        </div>
+                        <div id="finalProjectExistsState" class="hidden">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-semibold text-green-800" id="displayProjectName"></h4>
+                                        <p class="text-sm text-green-600 mt-1" id="displayProjectDescription"></p>
+                                    </div>
+                                    <button id="btnEditFinalProject" class="text-orange-600 hover:text-orange-800">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="editFinalProjectForm" class="hidden space-y-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Project Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" id="inpEditProjectName" maxlength="255"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Project Description
+                                    </label>
+                                    <textarea id="inpEditProjectDescription" rows="3" maxlength="2000"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
+                                </div>
+                                <div class="flex gap-3">
+                                    <button id="btnUpdateFinalProject"
+                                        class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                        Update
+                                    </button>
+                                    <button id="btnCancelEditFinalProject"
+                                        class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Documents Section -->
+                    <div id="documentsSection" class="hidden">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-xl font-semibold text-gray-800">Documents</h4>
+                            <button id="btnAddDocument"
+                                class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
+                                <i class="fas fa-plus"></i>
+                                Add Document
+                            </button>
+                        </div>
+
+                        <!-- Add Document Form -->
+                        <div id="addDocumentForm" class="hidden bg-gray-50 rounded-lg p-4 mb-4 space-y-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Document Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" id="inpDocumentName" maxlength="255"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="Enter document name">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Document Description
+                                </label>
+                                <textarea id="inpDocumentDescription" rows="2" maxlength="1000"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="Enter document description"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    PDF File <span class="text-red-500">*</span>
+                                </label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 transition-colors">
+                                    <input type="file" id="inpDocumentPdf" accept=".pdf" class="hidden">
+                                    <label for="inpDocumentPdf" class="cursor-pointer">
+                                        <i class="fas fa-file-pdf text-4xl text-red-500 mb-2"></i>
+                                        <p class="text-gray-700 font-medium mb-1">Click to select PDF file</p>
+                                        <p class="text-sm text-gray-500">Maximum file size: 50MB</p>
+                                    </label>
+                                    <div id="documentPdfPreview" class="hidden mt-4">
+                                        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between">
+                                            <div class="flex items-center gap-3">
+                                                <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
+                                                <div>
+                                                    <p class="text-sm font-medium text-gray-800" id="documentPdfFileName"></p>
+                                                    <p class="text-xs text-gray-500" id="documentPdfFileSize"></p>
+                                                </div>
+                                            </div>
+                                            <button type="button" id="btnRemoveDocumentPdf" class="text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex gap-3">
+                                <button id="btnSaveDocument"
+                                    class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                    Save Document
+                                </button>
+                                <button id="btnCancelAddDocument"
+                                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Documents List -->
+                        <div id="documentsList" class="space-y-3">
+                            <!-- Documents will be inserted here -->
+                        </div>
+                        <div id="documentsEmptyState" class="hidden text-center py-8">
+                            <i class="fas fa-file-pdf text-4xl text-gray-300 mb-2"></i>
+                            <p class="text-gray-500">No documents yet</p>
+                            <p class="text-gray-400 text-sm mt-1">Add a document to get started</p>
+                        </div>
+                    </div>
+
+                    <div id="finalProjectResult" class="hidden mt-4"></div>
+                </div>
+            </div>
+        </div>
 
     </div>
 
@@ -652,6 +805,10 @@
             if (btnAddChapter) {
                 btnAddChapter.style.display = 'block';
             }
+            const btnManageFinalProject = document.getElementById('btnManageFinalProject');
+            if (btnManageFinalProject) {
+                btnManageFinalProject.style.display = 'block';
+            }
         }
 
         // User Dropdown Toggle
@@ -709,6 +866,7 @@
             document.getElementById('courseDescriptionDisplay').textContent = course.courseDescription || 'No description';
 
             loadChapters(course.id);
+            loadFinalProject(course.id);
         }
 
         // Back to courses button
@@ -776,11 +934,10 @@
             // Reset form when closing
             document.getElementById('inpTextFile').value = '';
             document.getElementById('inpVisualFile').value = '';
-            document.getElementById('inpStatementsFile').value = '';
             document.getElementById('inpVideoLink').value = '';
             document.getElementById('inpChapterName').value = '';
             document.getElementById('inpChapterDescription').value = '';
-            ['textFileName', 'visualFileName', 'statementsFileName'].forEach(id => {
+            ['textFileName', 'visualFileName'].forEach(id => {
                 document.getElementById(id).classList.add('hidden');
             });
             // Reset visual PDF visibility
@@ -914,8 +1071,7 @@
         // File input handlers
         const fileInputMap = {
             'inpTextFile': 'textFileName',
-            'inpVisualFile': 'visualFileName',
-            'inpStatementsFile': 'statementsFileName'
+            'inpVisualFile': 'visualFileName'
         };
 
         Object.entries(fileInputMap).forEach(([inputId, displayId]) => {
@@ -1033,9 +1189,6 @@
             if (document.getElementById('inpVisualFile').files[0]) {
                 formData.append('visualPdfFile', document.getElementById('inpVisualFile').files[0]);
             }
-            if (document.getElementById('inpStatementsFile').files[0]) {
-                formData.append('statementsPdfFile', document.getElementById('inpStatementsFile').files[0]);
-            }
             if (chapterName) formData.append('chapterName', chapterName);
             if (chapterDescription) formData.append('chapterDescription', chapterDescription);
 
@@ -1060,7 +1213,6 @@
                     <strong>Chapter Name:</strong> ${escapeHtml(data.chapterName)}<br>
                     <strong>Text PDF:</strong> ${data.textFilename || 'N/A'}<br>
                     <strong>Visual PDF:</strong> ${data.visualFilename || 'N/A'}<br>
-                    <strong>Statements PDF:</strong> ${data.statementsFilename || 'Not provided'}<br>
                     <strong>Text Pages:</strong> ${data.numPagesText || 0}<br>
                     <strong>Visual Pages:</strong> ${data.numPagesVisual || 0}<br>
                     <strong>WebP Images:</strong> ${data.webpImages?.length || 0} images generated
@@ -1071,11 +1223,10 @@
                 // Clear form
                 document.getElementById('inpTextFile').value = '';
                 document.getElementById('inpVisualFile').value = '';
-                document.getElementById('inpStatementsFile').value = '';
                 document.getElementById('inpVideoLink').value = '';
                 document.getElementById('inpChapterName').value = '';
                 document.getElementById('inpChapterDescription').value = '';
-                ['textFileName', 'visualFileName', 'statementsFileName'].forEach(id => {
+                ['textFileName', 'visualFileName'].forEach(id => {
                     document.getElementById(id).classList.add('hidden');
                 });
                 // Reset visual PDF visibility
@@ -1958,6 +2109,359 @@
                 });
             }
         });
+
+        // ========== Final Project Management ==========
+        
+        // Load final project for current course
+        async function loadFinalProject(courseId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/courses/${courseId}/final-project`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    currentFinalProject = await response.json();
+                    updateFinalProjectUI();
+                } else if (response.status === 404) {
+                    currentFinalProject = null;
+                    updateFinalProjectUI();
+                } else {
+                    throw new Error('Failed to load final project');
+                }
+            } catch (error) {
+                console.error('Error loading final project:', error);
+                currentFinalProject = null;
+                updateFinalProjectUI();
+            }
+        }
+
+        // Update UI based on final project state
+        function updateFinalProjectUI() {
+            const btnText = document.getElementById('btnManageFinalProjectText');
+            if (currentFinalProject) {
+                if (btnText) btnText.textContent = 'Manage Final Project';
+                showFinalProjectExistsState();
+                loadDocuments();
+            } else {
+                if (btnText) btnText.textContent = 'Create Final Project';
+                showNoFinalProjectState();
+            }
+        }
+
+        function showNoFinalProjectState() {
+            document.getElementById('noFinalProjectState').classList.remove('hidden');
+            document.getElementById('finalProjectExistsState').classList.add('hidden');
+            document.getElementById('documentsSection').classList.add('hidden');
+        }
+
+        function showFinalProjectExistsState() {
+            document.getElementById('noFinalProjectState').classList.add('hidden');
+            document.getElementById('finalProjectExistsState').classList.remove('hidden');
+            document.getElementById('documentsSection').classList.remove('hidden');
+            
+            document.getElementById('displayProjectName').textContent = currentFinalProject.projectName || 'Untitled Project';
+            document.getElementById('displayProjectDescription').textContent = currentFinalProject.projectDescription || 'No description';
+        }
+
+        // Open final project modal
+        document.getElementById('btnManageFinalProject').addEventListener('click', () => {
+            if (!currentCourseId) {
+                alert('Please select a course first');
+                return;
+            }
+            loadFinalProject(currentCourseId);
+            document.getElementById('finalProjectModal').classList.remove('hidden');
+        });
+
+        // Close final project modal
+        document.getElementById('closeFinalProjectModal').addEventListener('click', () => {
+            document.getElementById('finalProjectModal').classList.add('hidden');
+            document.getElementById('addDocumentForm').classList.add('hidden');
+            document.getElementById('editFinalProjectForm').classList.add('hidden');
+            clearFinalProjectForm();
+        });
+
+        // Create final project
+        document.getElementById('btnCreateFinalProject').addEventListener('click', async () => {
+            const projectName = document.getElementById('inpProjectName').value.trim();
+            const projectDescription = document.getElementById('inpProjectDescription').value.trim();
+
+            if (!projectName) {
+                showFinalProjectError('Project name is required');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectName, projectDescription })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentFinalProject = data;
+                    updateFinalProjectUI();
+                    showFinalProjectSuccess('Final project created successfully!');
+                    clearFinalProjectForm();
+                } else {
+                    showFinalProjectError(data.error || 'Failed to create final project');
+                }
+            } catch (error) {
+                showFinalProjectError('Error creating final project: ' + error.message);
+            }
+        });
+
+        // Edit final project button
+        document.getElementById('btnEditFinalProject').addEventListener('click', () => {
+            document.getElementById('editFinalProjectForm').classList.remove('hidden');
+            document.getElementById('inpEditProjectName').value = currentFinalProject.projectName || '';
+            document.getElementById('inpEditProjectDescription').value = currentFinalProject.projectDescription || '';
+        });
+
+        // Cancel edit
+        document.getElementById('btnCancelEditFinalProject').addEventListener('click', () => {
+            document.getElementById('editFinalProjectForm').classList.add('hidden');
+        });
+
+        // Update final project
+        document.getElementById('btnUpdateFinalProject').addEventListener('click', async () => {
+            const projectName = document.getElementById('inpEditProjectName').value.trim();
+            const projectDescription = document.getElementById('inpEditProjectDescription').value.trim();
+
+            if (!projectName) {
+                showFinalProjectError('Project name is required');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project`, {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectName, projectDescription })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentFinalProject = { ...currentFinalProject, ...data };
+                    updateFinalProjectUI();
+                    document.getElementById('editFinalProjectForm').classList.add('hidden');
+                    showFinalProjectSuccess('Final project updated successfully!');
+                } else {
+                    showFinalProjectError(data.error || 'Failed to update final project');
+                }
+            } catch (error) {
+                showFinalProjectError('Error updating final project: ' + error.message);
+            }
+        });
+
+        // Add document button
+        document.getElementById('btnAddDocument').addEventListener('click', () => {
+            document.getElementById('addDocumentForm').classList.remove('hidden');
+            currentEditingDocumentId = null;
+            clearDocumentForm();
+        });
+
+        // Cancel add document
+        document.getElementById('btnCancelAddDocument').addEventListener('click', () => {
+            document.getElementById('addDocumentForm').classList.add('hidden');
+            clearDocumentForm();
+        });
+
+        // Save document
+        document.getElementById('btnSaveDocument').addEventListener('click', async () => {
+            const documentName = document.getElementById('inpDocumentName').value.trim();
+            const documentDescription = document.getElementById('inpDocumentDescription').value.trim();
+            const pdfFile = document.getElementById('inpDocumentPdf').files[0];
+
+            if (!documentName) {
+                showFinalProjectError('Document name is required');
+                return;
+            }
+
+            if (!pdfFile) {
+                showFinalProjectError('PDF file is required');
+                return;
+            }
+
+            if (pdfFile.type !== 'application/pdf') {
+                showFinalProjectError('File must be a PDF');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('documentName', documentName);
+                formData.append('documentDescription', documentDescription);
+                formData.append('pdfResource', pdfFile);
+
+                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project/documents`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showFinalProjectSuccess('Document added successfully!');
+                    document.getElementById('addDocumentForm').classList.add('hidden');
+                    clearDocumentForm();
+                    loadDocuments();
+                } else {
+                    showFinalProjectError(data.error || 'Failed to add document');
+                }
+            } catch (error) {
+                showFinalProjectError('Error adding document: ' + error.message);
+            }
+        });
+
+        // Load documents
+        async function loadDocuments() {
+            if (!currentFinalProject || !currentFinalProject.documents) {
+                document.getElementById('documentsList').innerHTML = '';
+                document.getElementById('documentsEmptyState').classList.remove('hidden');
+                return;
+            }
+
+            const documents = currentFinalProject.documents;
+            const documentsList = document.getElementById('documentsList');
+            const emptyState = document.getElementById('documentsEmptyState');
+
+            if (documents.length === 0) {
+                documentsList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            documentsList.innerHTML = documents.map(doc => `
+                <div class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                    <div class="flex-1">
+                        <h5 class="font-semibold text-gray-800">${escapeHtml(doc.documentName)}</h5>
+                        ${doc.documentDescription ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(doc.documentDescription)}</p>` : ''}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="${API_BASE}/api/courses/${currentCourseId}/final-project/documents/${doc.id}/pdf" 
+                           target="_blank"
+                           class="text-indigo-600 hover:text-indigo-800 px-3 py-1 rounded transition-colors">
+                            <i class="fas fa-download"></i> View PDF
+                        </a>
+                        <button onclick="deleteDocument('${doc.id}')" 
+                                class="text-red-600 hover:text-red-800 px-3 py-1 rounded transition-colors">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Delete document
+        window.deleteDocument = async function(documentId) {
+            if (!confirm('Are you sure you want to delete this document?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project/documents/${documentId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showFinalProjectSuccess('Document deleted successfully!');
+                    // Reload final project to get updated documents list
+                    await loadFinalProject(currentCourseId);
+                } else {
+                    showFinalProjectError(data.error || 'Failed to delete document');
+                }
+            } catch (error) {
+                showFinalProjectError('Error deleting document: ' + error.message);
+            }
+        };
+
+        // Helper functions
+        function clearFinalProjectForm() {
+            document.getElementById('inpProjectName').value = '';
+            document.getElementById('inpProjectDescription').value = '';
+        }
+
+        function clearDocumentForm() {
+            document.getElementById('inpDocumentName').value = '';
+            document.getElementById('inpDocumentDescription').value = '';
+            document.getElementById('inpDocumentPdf').value = '';
+            hideDocumentPdfPreview();
+        }
+
+        // Document PDF preview functions
+        function showDocumentPdfPreview(file) {
+            const preview = document.getElementById('documentPdfPreview');
+            const fileName = document.getElementById('documentPdfFileName');
+            const fileSize = document.getElementById('documentPdfFileSize');
+            
+            if (file) {
+                fileName.textContent = file.name;
+                const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+                fileSize.textContent = `${sizeInMB} MB`;
+                preview.classList.remove('hidden');
+            } else {
+                hideDocumentPdfPreview();
+            }
+        }
+
+        function hideDocumentPdfPreview() {
+            const preview = document.getElementById('documentPdfPreview');
+            preview.classList.add('hidden');
+            const fileInput = document.getElementById('inpDocumentPdf');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+        }
+
+        // Listen for file input change
+        const documentPdfInput = document.getElementById('inpDocumentPdf');
+        if (documentPdfInput) {
+            documentPdfInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                showDocumentPdfPreview(file);
+            });
+        }
+
+        // Remove PDF button
+        const btnRemoveDocumentPdf = document.getElementById('btnRemoveDocumentPdf');
+        if (btnRemoveDocumentPdf) {
+            btnRemoveDocumentPdf.addEventListener('click', () => {
+                hideDocumentPdfPreview();
+            });
+        }
+
+        function showFinalProjectSuccess(message) {
+            const resultDiv = document.getElementById('finalProjectResult');
+            resultDiv.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
+            resultDiv.innerHTML = `<p class="text-green-800">${escapeHtml(message)}</p>`;
+            resultDiv.classList.remove('hidden');
+            setTimeout(() => resultDiv.classList.add('hidden'), 3000);
+        }
+
+        function showFinalProjectError(message) {
+            const resultDiv = document.getElementById('finalProjectResult');
+            resultDiv.className = 'bg-red-50 border border-red-200 rounded-lg p-4';
+            resultDiv.innerHTML = `<p class="text-red-800">${escapeHtml(message)}</p>`;
+            resultDiv.classList.remove('hidden');
+            setTimeout(() => resultDiv.classList.add('hidden'), 5000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
         // Initialize - Check authentication first
         checkAuthentication().then(authenticated => {
