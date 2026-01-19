@@ -21,6 +21,12 @@ router.get('/:chapterId/summary', validation.validateDocId, validation.validateL
 // POST /api/courses/:courseId/chapters/:chapterId/lipsync - Generate lip sync for a chapter
 router.post('/:chapterId/lipsync', validation.validateDocId, chapterController.generateChapterLipSync);
 
+// POST /api/courses/:courseId/chapters/:chapterId/regenerate-tts - Regenerate TTS (delete old and regenerate)
+router.post('/:chapterId/regenerate-tts', validation.validateDocId, chapterController.regenerateChapterTTS);
+
+// POST /api/courses/:courseId/chapters/:chapterId/regenerate-lipsync - Regenerate lip sync (delete old and regenerate)
+router.post('/:chapterId/regenerate-lipsync', validation.validateDocId, chapterController.regenerateChapterLipSync);
+
 // GET /api/courses/:courseId/chapters/:chapterId/page-timings - Get page timings for a chapter
 router.get('/:chapterId/page-timings', validation.validateDocId, chapterController.getChapterPageTimings);
 

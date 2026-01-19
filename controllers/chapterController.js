@@ -1032,6 +1032,112 @@ async function generateChapterPageAudio(req, res) {
 }
 
 /**
+ * Regenerate TTS audio for a chapter (delete old and regenerate)
+ * POST /api/courses/:courseId/chapters/:chapterId/regenerate-tts
+ */
+async function regenerateChapterTTS(req, res) {
+    try {
+        const { courseId, chapterId } = req.params;
+
+        // Validate chapter exists
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
+        if (!chapter) {
+            return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        if (!chapter.textFilename) {
+            return res.status(400).json({ 
+                error: 'Chapter text PDF not found',
+                details: 'Cannot regenerate TTS without text PDF'
+            });
+        }
+
+        console.log(`[Chapter] Regenerating TTS for chapter ${chapterId}...`);
+
+        // Delete old audio files
+        const deleteResult = await fileUtils.deleteChapterAudioFiles(chapterId);
+        console.log(`[Chapter] Deleted audio files: ${deleteResult.deleted.join(', ')}`);
+        if (deleteResult.errors.length > 0) {
+            console.warn(`[Chapter] Errors deleting some files: ${deleteResult.errors.join(', ')}`);
+        }
+
+        // Regenerate page TTS (this will also generate main audio if needed)
+        generatePageTTSForChapter(chapterId, chapter.textFilename, courseId)
+            .then((results) => {
+                const successCount = results.filter(r => r.success).length;
+                console.log(`[Chapter] Completed TTS regeneration for chapter ${chapterId}: ${successCount}/${results.length} pages`);
+            })
+            .catch((error) => {
+                console.error(`[Chapter] TTS regeneration failed for chapter ${chapterId}:`, error.message);
+            });
+
+        res.json({
+            message: 'TTS regeneration started',
+            chapterId: chapterId,
+            status: 'processing',
+            deletedFiles: deleteResult.deleted,
+            errors: deleteResult.errors
+        });
+    } catch (error) {
+        console.error("[Chapter TTS Regeneration Error]:", error);
+        res.status(500).json({
+            error: 'Failed to regenerate TTS.',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Regenerate lip sync for a chapter (delete old and regenerate)
+ * POST /api/courses/:courseId/chapters/:chapterId/regenerate-lipsync
+ */
+async function regenerateChapterLipSync(req, res) {
+    try {
+        const { courseId, chapterId } = req.params;
+
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
+        if (!chapter) {
+            return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        console.log(`[Chapter] Regenerating lip sync for chapter ${chapterId}...`);
+
+        // Delete old lip sync file
+        const deleteResult = await fileUtils.deleteChapterLipSyncFile(chapterId);
+        if (deleteResult.error) {
+            console.warn(`[Chapter] Error deleting lip sync: ${deleteResult.error}`);
+        } else if (deleteResult.deleted) {
+            console.log(`[Chapter] Deleted old lip sync file`);
+        }
+
+        // Ensure audio exists before generating lip sync
+        const audioPath = await ensureChapterAudio(chapterId);
+
+        // Generate new lip sync
+        const lipSyncPath = fileUtils.getLipSyncFilePath(chapterId);
+        const lipSyncService = require('../services/lipSyncService');
+        await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+
+        const lipSyncData = await fileUtils.readLipSyncFile(chapterId);
+
+        res.json({
+            message: 'Lip sync regenerated successfully.',
+            chapterId,
+            lipSyncFile: `/audios/${chapterId}.json`,
+            mouthCues: lipSyncData?.mouthCues?.length || 0,
+            metadata: lipSyncData?.metadata || null,
+            deleted: deleteResult.deleted
+        });
+    } catch (error) {
+        console.error("[Chapter Lip Sync Regeneration Error]:", error);
+        res.status(500).json({
+            error: 'Failed to regenerate lip sync.',
+            details: error.message
+        });
+    }
+}
+
+/**
  * Get audio file for a specific page
  * GET /api/courses/:courseId/chapters/:chapterId/audio/:pageNumber
  */
@@ -1429,6 +1535,8 @@ async function deleteChapter(req, res) {
 }
 
 module.exports = {
+    regenerateChapterTTS,
+    regenerateChapterLipSync,
     createChapter,
     getChapters,
     getChapter,

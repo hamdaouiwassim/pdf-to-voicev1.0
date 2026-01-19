@@ -657,6 +657,58 @@ async function deleteChapterAssets(courseId, chapterId) {
     return true;
 }
 
+/**
+ * Delete chapter audio files (main audio and page audios)
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<{deleted: string[], errors: string[]}>} List of deleted files and errors
+ */
+async function deleteChapterAudioFiles(chapterId) {
+    const deleted = [];
+    const errors = [];
+
+    // Delete main chapter audio
+    const mainAudioPath = getAudioFilePath(chapterId);
+    try {
+        if (await fileExists(mainAudioPath)) {
+            await fsPromises.unlink(mainAudioPath);
+            deleted.push('main_audio');
+        }
+    } catch (error) {
+        errors.push(`main_audio: ${error.message}`);
+    }
+
+    // Delete page audio directory
+    const pageAudioDir = getPageAudioDir(chapterId);
+    try {
+        if (await fileExists(pageAudioDir)) {
+            await fsPromises.rm(pageAudioDir, { recursive: true, force: true });
+            deleted.push('page_audios');
+        }
+    } catch (error) {
+        errors.push(`page_audios: ${error.message}`);
+    }
+
+    return { deleted, errors };
+}
+
+/**
+ * Delete chapter lipsync file
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<{deleted: boolean, error: string|null}>}
+ */
+async function deleteChapterLipSyncFile(chapterId) {
+    const lipSyncPath = getLipSyncFilePath(chapterId);
+    try {
+        if (await fileExists(lipSyncPath)) {
+            await fsPromises.unlink(lipSyncPath);
+            return { deleted: true, error: null };
+        }
+        return { deleted: false, error: null };
+    } catch (error) {
+        return { deleted: false, error: error.message };
+    }
+}
+
 module.exports = {
     setupDirectories,
     getAITextByDocId,
@@ -689,5 +741,8 @@ module.exports = {
     readPageAudioFile,
     savePageAudioFile,
     getAudioDuration,
+    // Chapter regeneration functions
+    deleteChapterAudioFiles,
+    deleteChapterLipSyncFile,
 };
 
