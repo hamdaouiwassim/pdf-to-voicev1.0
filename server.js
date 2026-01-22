@@ -7,6 +7,7 @@ const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const session = require('express-session');
 const path = require('path');
+const fs = require('fs');
 
 console.log('📦 Loading configuration...');
 let config;
@@ -113,10 +114,41 @@ const setInlineHeaders = (req, res, next) => {
     next();
 };
 
-// Add CORS headers and inline disposition to static file serving
-app.use('/uploads', setInlineHeaders, express.static(config.UPLOADS_DIR));
+// Media folder: serve /media static (media/{courseId}/...)
+app.use('/media', setInlineHeaders, express.static(config.MEDIA_DIR));
+
+// /uploads: course assets from media/{courseId}/uploads/courses/{courseId}/*, else _global/uploads
+const uploadsMediaMiddleware = (req, res, next) => {
+    const pathname = (req.originalUrl || req.url || '').split('?')[0];
+    const m = pathname.match(/^\/uploads\/courses\/([^/]+)\/(.+)$/);
+    if (!m) return next();
+    const [, courseId, subPath] = m;
+    const base = path.resolve(config.MEDIA_DIR, courseId, 'uploads', 'courses', courseId);
+    const filePath = path.resolve(base, subPath);
+    const baseNorm = base + path.sep;
+    if (!filePath.startsWith(baseNorm) && filePath !== base) {
+        return next();
+    }
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        return next();
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    if (filePath.toLowerCase().endsWith('.pdf')) {
+        res.setHeader('Content-Disposition', 'inline; filename="' + path.basename(filePath) + '"');
+        res.setHeader('Content-Type', 'application/pdf');
+    }
+    res.sendFile(path.resolve(filePath), (err) => { if (err && !res.headersSent) next(); });
+};
+app.use('/uploads', setInlineHeaders, uploadsMediaMiddleware, express.static(config.UPLOADS_DIR));
+
+// /audios: global audios (media/_global/audios)
 app.use('/audios', (req, res, next) => {
-    // Set CORS headers (use origin from request if in allowed list)
     const origin = req.headers.origin;
     if (origin && allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
@@ -175,6 +207,7 @@ async function startServer() {
                 console.log(`✓ Server is accessible at http://localhost:${config.PORT}`);
                 const keyDisplay = config.GEMINI_API_KEY ? `${config.GEMINI_API_KEY.substring(0, 4)}...` : 'NOT SET';
                 console.log(`API Key: ${keyDisplay} (Set via .env file or GEMINI_API_KEY)`);
+                console.log(`Media Directory: ${config.MEDIA_DIR}`);
                 console.log(`Uploads Directory: ${config.UPLOADS_DIR}`);
                 console.log(`Audio Directory: ${config.AUDIOS_DIR}`);
                 console.log(`Platform: ${process.platform}`);

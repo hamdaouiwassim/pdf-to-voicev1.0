@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const dbUtils = require('../utils/dbUtils');
 const subscriptionUtils = require('../utils/subscriptionUtils');
-const config = require('../config/config');
+const fileUtils = require('../utils/fileUtils');
 
 /**
  * Create a new course
@@ -40,8 +40,8 @@ async function createCourse(req, res) {
                 return res.status(400).json({ error: 'Course image must be less than 5MB' });
             }
 
-            // Create course directory
-            const courseDir = path.join(config.UPLOADS_DIR, 'courses', courseId);
+            // Create course directory (media/{courseId}/uploads/courses/{courseId})
+            const courseDir = fileUtils.getCourseUploadsCourseDir(courseId);
             await fs.mkdir(courseDir, { recursive: true });
 
             // Get file extension
@@ -204,8 +204,8 @@ async function updateCourse(req, res) {
                 return res.status(400).json({ error: 'Course image must be less than 5MB' });
             }
 
-            // Create course directory if it doesn't exist
-            const courseDir = path.join(config.UPLOADS_DIR, 'courses', courseId);
+            // Create course directory if it doesn't exist (media layout)
+            const courseDir = fileUtils.getCourseUploadsCourseDir(courseId);
             await fs.mkdir(courseDir, { recursive: true });
 
             // Delete old image if it exists

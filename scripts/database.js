@@ -258,6 +258,48 @@ async function createTables() {
         `);
         console.log('✓ Exercises table created/verified');
 
+        // Create quiz_questions table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS quiz_questions (
+                id VARCHAR(36) PRIMARY KEY,
+                chapter_id VARCHAR(36) NOT NULL,
+                question_text TEXT NOT NULL,
+                options JSON NOT NULL,
+                question_type ENUM('single', 'multiple') DEFAULT 'single',
+                correct_answer_index INT NULL,
+                correct_answer_indices JSON NULL,
+                explanation TEXT,
+                order_index INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+                INDEX idx_chapter_id (chapter_id),
+                INDEX idx_order_index (order_index),
+                INDEX idx_question_type (question_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        console.log('✓ Quiz questions table created/verified');
+
+        // Create quiz_attempts table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS quiz_attempts (
+                id VARCHAR(36) PRIMARY KEY,
+                user_id INT NOT NULL,
+                chapter_id VARCHAR(36) NOT NULL,
+                score INT NOT NULL,
+                total_questions INT NOT NULL,
+                percentage DECIMAL(5, 2) NOT NULL,
+                answers JSON NOT NULL,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+                INDEX idx_user_id (user_id),
+                INDEX idx_chapter_id (chapter_id),
+                INDEX idx_completed_at (completed_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        console.log('✓ Quiz attempts table created/verified');
+
         // Verify tables
         const tables = await db.query('SHOW TABLES');
         console.log('\n✓ All tables created successfully!');

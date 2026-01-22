@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs').promises;
 const dbUtils = require('../utils/dbUtils');
-const config = require('../config/config');
+const fileUtils = require('../utils/fileUtils');
 
 /**
  * Create a new lab
@@ -240,8 +240,8 @@ async function createExercise(req, res) {
                 return res.status(400).json({ error: 'PDF resource must be less than 50MB' });
             }
 
-            // Create lab directory structure: uploads/labs/{courseId}/{labId}/
-            const labDir = path.join(config.UPLOADS_DIR, 'labs', lab.courseId, labId);
+            // Create lab directory structure: media/{courseId}/uploads/labs/{labId}/
+            const labDir = fileUtils.getLabDir(lab.courseId, labId);
             await fs.mkdir(labDir, { recursive: true });
 
             // Save PDF file
@@ -358,7 +358,7 @@ async function updateExercise(req, res) {
 
             // Delete old PDF if exists
             if (existingExercise.pdfResource) {
-                const oldPdfPath = path.join(config.UPLOADS_DIR, 'labs', lab.courseId, existingExercise.labId, existingExercise.pdfResource);
+                const oldPdfPath = path.join(fileUtils.getLabDir(lab.courseId, existingExercise.labId), existingExercise.pdfResource);
                 try {
                     await fs.unlink(oldPdfPath);
                 } catch (err) {
@@ -367,7 +367,7 @@ async function updateExercise(req, res) {
             }
 
             // Create lab directory structure
-            const labDir = path.join(config.UPLOADS_DIR, 'labs', lab.courseId, existingExercise.labId);
+            const labDir = fileUtils.getLabDir(lab.courseId, existingExercise.labId);
             await fs.mkdir(labDir, { recursive: true });
 
             // Save new PDF file
@@ -412,7 +412,7 @@ async function deleteExercise(req, res) {
         if (exercise.pdfResource) {
             const lab = await dbUtils.getLabById(exercise.labId);
             if (lab) {
-                const pdfPath = path.join(config.UPLOADS_DIR, 'labs', lab.courseId, exercise.labId, exercise.pdfResource);
+                const pdfPath = path.join(fileUtils.getLabDir(lab.courseId, exercise.labId), exercise.pdfResource);
                 try {
                     await fs.unlink(pdfPath);
                 } catch (err) {
@@ -455,7 +455,7 @@ async function getExercisePdf(req, res) {
             return res.status(404).json({ error: 'Lab not found' });
         }
 
-        const pdfPath = path.join(config.UPLOADS_DIR, 'labs', lab.courseId, exercise.labId, exercise.pdfResource);
+        const pdfPath = path.join(fileUtils.getLabDir(lab.courseId, exercise.labId), exercise.pdfResource);
 
         // Check if file exists
         try {

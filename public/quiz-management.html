@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Management - Titan Academy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-white shadow-lg mb-8">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-6">
+                    <a href="/index.html"
+                        class="flex items-center gap-2 text-gray-800 hover:text-indigo-600 transition-colors">
+                        <img src="/logo.png" alt="Titan Academy" class="h-8 w-auto">
+                        <span class="text-xl font-bold">Titan Academy</span>
+                    </a>
+                    <a href="/index.html"
+                        class="px-4 py-2 text-indigo-600 bg-indigo-50 rounded-lg font-semibold flex items-center gap-2">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Courses
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-xl p-8 fade-in">
+                <div class="mb-6">
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                        <i class="fas fa-question-circle text-purple-500 mr-3"></i>
+                        Manage Quiz: <span id="quizChapterName" class="text-purple-600"></span>
+                    </h1>
+                    <p class="text-gray-600">Add and manage quiz questions for this chapter</p>
+                </div>
+
+                <!-- Add Question Button -->
+                <div class="mb-6">
+                    <button id="btnAddQuizQuestion"
+                        class="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center">
+                        <i class="fas fa-plus-circle mr-2"></i>
+                        Add New Question
+                    </button>
+                </div>
+
+                <!-- Questions List -->
+                <div id="quizQuestionsList" class="space-y-4">
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>Loading questions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Quiz Question Modal -->
+    <div id="quizQuestionModal"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h3 id="quizQuestionModalTitle" class="text-2xl font-semibold text-gray-800">Add Quiz Question</h3>
+                <button id="closeQuizQuestionModal" class="text-gray-400 hover:text-gray-600 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div>
+                        <label for="inpQuestionText" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Question Text <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="inpQuestionText" rows="3"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                            placeholder="Enter your question here..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Answer Options <span class="text-red-500">*</span> (Minimum 2 options)
+                        </label>
+                        <div id="quizOptionsContainer" class="space-y-2">
+                            <!-- Options will be added here -->
+                        </div>
+                        <button type="button" id="btnAddOption"
+                            class="mt-2 text-purple-600 hover:text-purple-700 text-sm font-semibold flex items-center gap-1">
+                            <i class="fas fa-plus"></i>
+                            Add Option
+                        </button>
+                    </div>
+
+                    <div>
+                        <label for="inpQuestionType" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Question Type <span class="text-red-500">*</span>
+                        </label>
+                        <select id="inpQuestionType"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="single">Single Choice (Select One)</option>
+                            <option value="multiple">Multiple Choice (Select All That Apply)</option>
+                        </select>
+                    </div>
+
+                    <div id="singleAnswerContainer">
+                        <label for="inpCorrectAnswer" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Correct Answer <span class="text-red-500">*</span>
+                        </label>
+                        <select id="inpCorrectAnswer"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="">Select correct answer...</option>
+                        </select>
+                    </div>
+
+                    <div id="multipleAnswersContainer" class="hidden">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Correct Answers <span class="text-red-500">*</span> (Select all that apply)
+                        </label>
+                        <div id="multipleAnswersCheckboxes" class="space-y-2 border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
+                            <!-- Checkboxes will be added here -->
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Select all correct answers for this question</p>
+                    </div>
+
+                    <div>
+                        <label for="inpQuestionExplanation" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Explanation (optional)
+                        </label>
+                        <textarea id="inpQuestionExplanation" rows="2"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                            placeholder="Explanation shown after quiz submission..."></textarea>
+                    </div>
+
+                    <div>
+                        <label for="inpQuestionOrder" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Order Index
+                        </label>
+                        <input type="number" id="inpQuestionOrder" min="0" value="0"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button type="button" id="btnSaveQuizQuestion"
+                            class="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg">
+                            <i class="fas fa-save mr-2"></i>
+                            <span id="btnSaveQuizQuestionText">Save Question</span>
+                        </button>
+                        <button type="button" id="btnCancelQuizQuestion"
+                            class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                    <div id="quizQuestionResult" class="hidden mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentQuizCourseId = null;
+        let currentQuizChapterId = null;
+        let currentEditingQuestionId = null;
+        let quizOptionsCount = 2;
+
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        currentQuizCourseId = urlParams.get('courseId');
+        currentQuizChapterId = urlParams.get('chapterId');
+        const chapterName = urlParams.get('chapterName');
+
+        if (!currentQuizCourseId || !currentQuizChapterId) {
+            alert('Course ID and Chapter ID are required');
+            window.location.href = '/index.html';
+        }
+
+        // Check authentication
+        async function checkAuthentication() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/status`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (!data.authenticated) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Check auth on page load
+        checkAuthentication();
+
+        if (chapterName) {
+            document.getElementById('quizChapterName').textContent = decodeURIComponent(chapterName);
+        }
+
+        // Load questions on page load
+        loadQuizQuestions(currentQuizCourseId, currentQuizChapterId);
+
+        // Add Question button
+        document.getElementById('btnAddQuizQuestion').addEventListener('click', () => {
+            currentEditingQuestionId = null;
+            document.getElementById('quizQuestionModalTitle').textContent = 'Add Quiz Question';
+            document.getElementById('btnSaveQuizQuestionText').textContent = 'Save Question';
+            resetQuizQuestionForm();
+            document.getElementById('quizQuestionModal').classList.remove('hidden');
+        });
+
+        // Close Quiz Question Modal
+        document.getElementById('closeQuizQuestionModal').addEventListener('click', () => {
+            document.getElementById('quizQuestionModal').classList.add('hidden');
+            resetQuizQuestionForm();
+        });
+
+        document.getElementById('btnCancelQuizQuestion').addEventListener('click', () => {
+            document.getElementById('quizQuestionModal').classList.add('hidden');
+            resetQuizQuestionForm();
+        });
+
+        // Load quiz questions
+        async function loadQuizQuestions(courseId, chapterId) {
+            const questionsList = document.getElementById('quizQuestionsList');
+            questionsList.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Loading questions...</p></div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/quiz/admin`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load quiz questions');
+                }
+
+                const data = await response.json();
+                renderQuizQuestions(data.questions || []);
+            } catch (error) {
+                questionsList.innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>Error loading questions: ${escapeHtml(error.message)}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Render quiz questions
+        function renderQuizQuestions(questions) {
+            const questionsList = document.getElementById('quizQuestionsList');
+            
+            if (questions.length === 0) {
+                questionsList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-question-circle text-4xl mb-4 text-gray-300"></i>
+                        <p class="text-lg font-semibold mb-2">No quiz questions yet</p>
+                        <p class="text-sm">Click "Add New Question" to create your first question</p>
+                    </div>
+                `;
+                return;
+            }
+
+            questionsList.innerHTML = questions.map((q, index) => `
+                <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-semibold">
+                                    Question ${index + 1}
+                                </span>
+                                <span class="text-xs text-gray-500">Order: ${q.orderIndex}</span>
+                                <span class="text-xs ${q.questionType === 'multiple' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'} px-2 py-1 rounded">
+                                    ${q.questionType === 'multiple' ? 'Multiple Choice' : 'Single Choice'}
+                                </span>
+                            </div>
+                            <h4 class="font-semibold text-gray-800 mb-2">${escapeHtml(q.questionText)}</h4>
+                            <div class="space-y-1">
+                                ${q.options.map((opt, optIndex) => {
+                                    const isCorrect = q.questionType === 'single' 
+                                        ? optIndex === q.correctAnswerIndex
+                                        : (Array.isArray(q.correctAnswerIndices) && q.correctAnswerIndices.includes(optIndex));
+                                    return `
+                                        <div class="flex items-center gap-2 text-sm ${isCorrect ? 'text-green-600 font-semibold' : 'text-gray-600'}">
+                                            ${isCorrect ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-circle text-gray-300"></i>'}
+                                            <span>${escapeHtml(opt)}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            ${q.explanation ? `
+                                <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                                    <strong>Explanation:</strong> ${escapeHtml(q.explanation)}
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="flex items-center gap-2 ml-4">
+                            <button onclick="editQuizQuestion('${q.id}')" 
+                                class="text-indigo-500 hover:text-indigo-600 p-2" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteQuizQuestion('${q.id}')" 
+                                class="text-red-500 hover:text-red-600 p-2" title="Delete">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Initialize quiz question form
+        function initializeQuizQuestionForm() {
+            quizOptionsCount = 2;
+            updateQuizOptions();
+            document.getElementById('inpQuestionType').addEventListener('change', handleQuestionTypeChange);
+            document.getElementById('btnAddOption').addEventListener('click', () => {
+                quizOptionsCount++;
+                updateQuizOptions();
+            });
+        }
+
+        function updateQuizOptions() {
+            const container = document.getElementById('quizOptionsContainer');
+            container.innerHTML = '';
+            for (let i = 0; i < quizOptionsCount; i++) {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'flex items-center gap-2';
+                optionDiv.innerHTML = `
+                    <input type="text" data-option-index="${i}" 
+                        class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Option ${i + 1}" />
+                    ${quizOptionsCount > 2 ? `
+                        <button type="button" onclick="removeOption(${i})" 
+                            class="text-red-500 hover:text-red-700 p-2" title="Remove">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    ` : ''}
+                `;
+                container.appendChild(optionDiv);
+            }
+            handleQuestionTypeChange();
+        }
+
+        function removeOption(index) {
+            if (quizOptionsCount <= 2) return;
+            quizOptionsCount--;
+            updateQuizOptions();
+        }
+
+        function handleQuestionTypeChange() {
+            const questionType = document.getElementById('inpQuestionType').value;
+            const singleContainer = document.getElementById('singleAnswerContainer');
+            const multipleContainer = document.getElementById('multipleAnswersContainer');
+            const correctAnswerSelect = document.getElementById('inpCorrectAnswer');
+            const multipleCheckboxes = document.getElementById('multipleAnswersCheckboxes');
+
+            if (questionType === 'multiple') {
+                singleContainer.classList.add('hidden');
+                multipleContainer.classList.remove('hidden');
+                updateMultipleAnswersCheckboxes();
+            } else {
+                singleContainer.classList.remove('hidden');
+                multipleContainer.classList.add('hidden');
+                updateCorrectAnswerSelect();
+            }
+        }
+
+        function updateCorrectAnswerSelect() {
+            const select = document.getElementById('inpCorrectAnswer');
+            select.innerHTML = '<option value="">Select correct answer...</option>';
+            for (let i = 0; i < quizOptionsCount; i++) {
+                const input = document.querySelector(`[data-option-index="${i}"]`);
+                const optionText = input ? input.value || `Option ${i + 1}` : `Option ${i + 1}`;
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = optionText;
+                select.appendChild(option);
+            }
+        }
+
+        function updateMultipleAnswersCheckboxes() {
+            const container = document.getElementById('multipleAnswersCheckboxes');
+            container.innerHTML = '';
+            for (let i = 0; i < quizOptionsCount; i++) {
+                const input = document.querySelector(`[data-option-index="${i}"]`);
+                const optionText = input ? input.value || `Option ${i + 1}` : `Option ${i + 1}`;
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.className = 'flex items-center gap-2';
+                checkboxDiv.innerHTML = `
+                    <input type="checkbox" id="correct-${i}" value="${i}" 
+                        class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
+                    <label for="correct-${i}" class="text-sm text-gray-700">${escapeHtml(optionText)}</label>
+                `;
+                container.appendChild(checkboxDiv);
+            }
+        }
+
+        // Update options when inputs change
+        document.addEventListener('input', (e) => {
+            if (e.target.hasAttribute('data-option-index')) {
+                const questionType = document.getElementById('inpQuestionType').value;
+                if (questionType === 'single') {
+                    updateCorrectAnswerSelect();
+                } else {
+                    updateMultipleAnswersCheckboxes();
+                }
+            }
+        });
+
+        // Edit quiz question
+        window.editQuizQuestion = async function(questionId) {
+            currentEditingQuestionId = questionId;
+            document.getElementById('quizQuestionModalTitle').textContent = 'Edit Quiz Question';
+            document.getElementById('btnSaveQuizQuestionText').textContent = 'Update Question';
+
+            try {
+                // Load question data (we'll need to get it from the list or fetch it)
+                // For now, we'll extract from the rendered list
+                const response = await fetch(`${API_BASE}/api/courses/${currentQuizCourseId}/chapters/${currentQuizChapterId}/quiz/admin`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                const question = data.questions.find(q => q.id === questionId);
+
+                if (!question) {
+                    throw new Error('Question not found');
+                }
+
+                // Populate form
+                document.getElementById('inpQuestionText').value = question.questionText || '';
+                document.getElementById('inpQuestionExplanation').value = question.explanation || '';
+                document.getElementById('inpQuestionOrder').value = question.orderIndex || 0;
+                document.getElementById('inpQuestionType').value = question.questionType || 'single';
+
+                quizOptionsCount = question.options.length;
+                updateQuizOptions();
+                
+                // Set option values
+                question.options.forEach((opt, index) => {
+                    const input = document.querySelector(`[data-option-index="${index}"]`);
+                    if (input) input.value = opt;
+                });
+
+                // Set correct answers
+                if (question.questionType === 'single') {
+                    document.getElementById('inpCorrectAnswer').value = question.correctAnswerIndex;
+                } else {
+                    const correctIndices = question.correctAnswerIndices || [];
+                    correctIndices.forEach(index => {
+                        const checkbox = document.getElementById(`correct-${index}`);
+                        if (checkbox) checkbox.checked = true;
+                    });
+                }
+
+                handleQuestionTypeChange();
+                document.getElementById('quizQuestionModal').classList.remove('hidden');
+            } catch (error) {
+                alert('Error loading question: ' + error.message);
+            }
+        };
+
+        // Delete quiz question
+        window.deleteQuizQuestion = async function(questionId) {
+            if (!confirm('Delete this question?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/courses/${currentQuizCourseId}/chapters/${currentQuizChapterId}/quiz/admin/questions/${questionId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to delete question');
+                }
+
+                loadQuizQuestions(currentQuizCourseId, currentQuizChapterId);
+            } catch (error) {
+                alert('Error deleting question: ' + error.message);
+            }
+        };
+
+        // Save quiz question
+        document.getElementById('btnSaveQuizQuestion').addEventListener('click', async () => {
+            const questionText = document.getElementById('inpQuestionText').value.trim();
+            const questionType = document.getElementById('inpQuestionType').value;
+            const explanation = document.getElementById('inpQuestionExplanation').value.trim();
+            const orderIndex = parseInt(document.getElementById('inpQuestionOrder').value) || 0;
+
+            if (!questionText) {
+                showQuizResult('error', 'Question text is required');
+                return;
+            }
+
+            // Get options
+            const options = [];
+            for (let i = 0; i < quizOptionsCount; i++) {
+                const input = document.querySelector(`[data-option-index="${i}"]`);
+                if (input && input.value.trim()) {
+                    options.push(input.value.trim());
+                }
+            }
+
+            if (options.length < 2) {
+                showQuizResult('error', 'At least 2 options are required');
+                return;
+            }
+
+            // Get correct answer(s)
+            let correctAnswerIndex = null;
+            let correctAnswerIndices = null;
+
+            if (questionType === 'single') {
+                const selected = document.getElementById('inpCorrectAnswer').value;
+                if (selected === '') {
+                    showQuizResult('error', 'Please select the correct answer');
+                    return;
+                }
+                correctAnswerIndex = parseInt(selected);
+            } else {
+                const checkboxes = document.querySelectorAll('#multipleAnswersCheckboxes input[type="checkbox"]:checked');
+                if (checkboxes.length === 0) {
+                    showQuizResult('error', 'Please select at least one correct answer');
+                    return;
+                }
+                correctAnswerIndices = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            }
+
+            const questionData = {
+                questionText,
+                questionType,
+                options,
+                orderIndex,
+                explanation: explanation || null
+            };
+
+            if (questionType === 'single') {
+                questionData.correctAnswerIndex = correctAnswerIndex;
+            } else {
+                questionData.correctAnswerIndices = correctAnswerIndices;
+            }
+
+            const btn = document.getElementById('btnSaveQuizQuestion');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+            try {
+                const url = currentEditingQuestionId
+                    ? `${API_BASE}/api/courses/${currentQuizCourseId}/chapters/${currentQuizChapterId}/quiz/admin/questions/${currentEditingQuestionId}`
+                    : `${API_BASE}/api/courses/${currentQuizCourseId}/chapters/${currentQuizChapterId}/quiz/admin/questions`;
+                const method = currentEditingQuestionId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(questionData)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to save question');
+                }
+
+                showQuizResult('success', currentEditingQuestionId ? 'Question updated successfully!' : 'Question created successfully!');
+                document.getElementById('quizQuestionModal').classList.add('hidden');
+                resetQuizQuestionForm();
+                loadQuizQuestions(currentQuizCourseId, currentQuizChapterId);
+            } catch (error) {
+                showQuizResult('error', error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-save mr-2"></i><span>${currentEditingQuestionId ? 'Update' : 'Save'} Question</span>`;
+            }
+        });
+
+        function resetQuizQuestionForm() {
+            document.getElementById('inpQuestionText').value = '';
+            document.getElementById('inpQuestionExplanation').value = '';
+            document.getElementById('inpQuestionOrder').value = '0';
+            document.getElementById('inpQuestionType').value = 'single';
+            currentEditingQuestionId = null;
+            quizOptionsCount = 2;
+            updateQuizOptions();
+            document.getElementById('quizQuestionResult').classList.add('hidden');
+        }
+
+        function showQuizResult(type, message) {
+            const resultDiv = document.getElementById('quizQuestionResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = `mt-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`;
+            resultDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+                    <span>${escapeHtml(message)}</span>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeQuizQuestionForm();
+        });
+    </script>
+</body>
+
+</html>

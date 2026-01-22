@@ -43,7 +43,7 @@
                 <div class="flex items-center gap-6">
                     <a href="/index.html"
                         class="flex items-center gap-2 text-gray-800 hover:text-indigo-600 transition-colors">
-                        <i class="fas fa-graduation-cap text-red-500 text-2xl"></i>
+                        <img src="/logo.png" alt="Titan Academy" class="h-8 w-auto">
                         <span class="text-xl font-bold">Titan Academy</span>
                     </a>
                     <div class="flex gap-4">
@@ -139,6 +139,7 @@
                         All Courses
                     </h2>
                     <button id="btnAddCourse"
+                        onclick="window.location.href='/course-management.html'"
                         class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
                         <i class="fas fa-plus-circle mr-2"></i>
                         Add Course
@@ -179,7 +180,7 @@
                     <p class="text-gray-400 text-sm mt-2">Try a different search term</p>
                 </div>
 
-                <div id="coursesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
+                <div id="coursesGrid" class="space-y-3 hidden">
                     <!-- Courses will be inserted here -->
                 </div>
             </div>
@@ -188,12 +189,28 @@
         <!-- Course Details View (Chapters List) -->
         <div id="courseDetailsView" class="fade-in hidden">
             <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center gap-4">
+                <div class="mb-6">
+                    <div class="flex items-start justify-between mb-4">
                         <button id="btnBackToCourses" class="text-gray-600 hover:text-gray-800 transition-colors"
                             title="Back to courses">
                             <i class="fas fa-arrow-left text-2xl"></i>
                         </button>
+                        <div class="flex gap-3">
+                        <button id="btnManageFinalProject"
+                            onclick="window.location.href='/final-project-management.html?courseId=' + (currentCourseId || '')"
+                            class="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
+                            <i class="fas fa-project-diagram mr-2"></i>
+                            <span id="btnManageFinalProjectText">Manage Final Project</span>
+                        </button>
+                            <button id="btnAddChapter"
+                                onclick="window.location.href='/chapter-management.html?courseId=' + (currentCourseId || '')"
+                                class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
+                                <i class="fas fa-plus-circle mr-2"></i>
+                                Add Chapter
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
                         <div>
                             <h2 id="courseDetailsTitle" class="text-2xl font-semibold text-gray-800 flex items-center">
                                 <i class="fas fa-graduation-cap text-blue-500 mr-3"></i>
@@ -201,18 +218,6 @@
                             </h2>
                             <p id="courseDescriptionDisplay" class="text-sm text-gray-500 mt-1"></p>
                         </div>
-                    </div>
-                    <div class="flex gap-3">
-                        <button id="btnManageFinalProject"
-                            class="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
-                            <i class="fas fa-project-diagram mr-2"></i>
-                            <span id="btnManageFinalProjectText">Manage Final Project</span>
-                        </button>
-                        <button id="btnAddChapter"
-                            class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg flex items-center">
-                            <i class="fas fa-plus-circle mr-2"></i>
-                            Add Chapter
-                        </button>
                     </div>
                 </div>
 
@@ -227,326 +232,20 @@
                     <p class="text-gray-400 text-sm mt-2">Add a chapter to get started</p>
                 </div>
 
-                <div id="chaptersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
+                <div id="chaptersGrid" class="space-y-3 hidden">
                     <!-- Chapters will be inserted here -->
                 </div>
             </div>
         </div>
 
-        <!-- Create Course Modal -->
-        <div id="createCourseModal"
-            class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                    <h3 id="createCourseModalTitle" class="text-2xl font-semibold text-gray-800">Create New Course</h3>
-                    <button id="closeCreateCourseModal" class="text-gray-400 hover:text-gray-600 text-2xl">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="p-6">
-                    <div class="space-y-4">
-                        <div>
-                            <label for="inpCourseName" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Course Name <span class="text-red-500">*</span>
-                            </label>
-                            <input type="text" id="inpCourseName" maxlength="150"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="e.g. Artificial Intelligence Fundamentals" />
-                        </div>
-                        <div>
-                            <label for="inpCourseDescription" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Course Description <span class="text-red-500">*</span>
-                            </label>
-                            <textarea id="inpCourseDescription" rows="4" maxlength="2000"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                placeholder="Describe the course content..."></textarea>
-                        </div>
-                        <div>
-                            <label for="inpCourseImage" class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-image text-purple-500 mr-2"></i>
-                                Course Image (optional)
-                            </label>
-                            <input type="file" id="inpCourseImage"
-                                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
-                            <p class="text-xs text-gray-500 mt-1">Accepted formats: JPEG, PNG, WebP, GIF (max 5MB)</p>
-                            <div id="courseImagePreview" class="hidden mt-2">
-                                <img id="courseImagePreviewImg" src="" alt="Course image preview"
-                                    class="max-w-full h-32 object-cover rounded-lg border border-gray-300" />
-                            </div>
-                        </div>
-                        <button type="button" id="btnCreateCourse"
-                            class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                            <i class="fas fa-plus mr-2"></i>
-                            <span id="btnCreateCourseText">Create Course</span>
-                        </button>
-                        <div id="courseCreateResult" class="hidden mt-4"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Create Course Modal - Removed: Now in course-management.html -->
 
-        <!-- Update Chapter Modal -->
-        <div id="updateChapterModal"
-            class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                    <h3 class="text-2xl font-semibold text-gray-800">Update Chapter</h3>
-                    <button id="closeUpdateChapterModal" class="text-gray-400 hover:text-gray-600 text-2xl">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="p-6">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 space-y-2">
-                        <p class="text-sm text-blue-800 flex items-center gap-2">
-                            <i class="fas fa-info-circle"></i>
-                            <span><strong>Note:</strong> PDF files are optional. Only upload new files if you want to
-                                replace existing ones.</span>
-                        </p>
-                        <p class="text-sm text-blue-800 flex items-center gap-2">
-                            <i class="fas fa-trash-alt text-orange-500"></i>
-                            <span><strong>Important:</strong> When you upload a new PDF file, the old file will be
-                                automatically deleted and replaced.</span>
-                        </p>
-                    </div>
+        <!-- Update Chapter Modal - Removed: Now in chapter-management.html -->
 
-                    <div class="space-y-4">
-                        <div>
-                            <label for="inpUpdateChapterName" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Chapter Name <span class="text-red-500">*</span>
-                            </label>
-                            <input type="text" id="inpUpdateChapterName" maxlength="150"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Chapter name" />
-                        </div>
-                        <div>
-                            <label for="inpUpdateChapterDescription"
-                                class="block text-sm font-semibold text-gray-700 mb-2">
-                                Chapter Description
-                            </label>
-                            <textarea id="inpUpdateChapterDescription" rows="4"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                placeholder="Brief description of this chapter..."></textarea>
-                        </div>
-                        <div>
-                            <label for="inpUpdateVideoLink" class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-video text-purple-500 mr-2"></i>
-                                Video Link (optional)
-                            </label>
-                            <input type="url" id="inpUpdateVideoLink"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                placeholder="https://example.com/video.mp4" />
-                            <p class="text-xs text-gray-500 mt-1">Leave empty to remove video link</p>
-                        </div>
+        <!-- Quiz Management Modal - Removed: Now in quiz-management.html -->
+        <!-- Add/Edit Quiz Question Modal - Removed: Now in quiz-management.html -->
 
-                        <!-- PDF File Uploads -->
-                        <div class="space-y-4 border-t border-gray-200 pt-4">
-                            <h4 class="text-lg font-semibold text-gray-800 mb-3">Update PDF Files (Optional)</h4>
-
-                            <!-- Text PDF -->
-                            <div
-                                class="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-blue-400 transition-colors">
-                                <div class="text-center mb-4">
-                                    <input type="file" id="inpUpdateTextFile" accept=".pdf" class="hidden">
-                                    <label for="inpUpdateTextFile" class="cursor-pointer">
-                                        <i class="fas fa-file-alt text-4xl text-green-500 mb-2"></i>
-                                        <p class="text-gray-700 font-medium mb-1">Text PDF (for TTS) <span
-                                                class="text-gray-500 text-sm">(optional)</span></p>
-                                        <p class="text-sm text-gray-500">Replace the text PDF used for voice synthesis
-                                        </p>
-                                    </label>
-                                    <div id="updateTextFileName" class="mt-2 text-green-600 font-medium text-sm hidden">
-                                    </div>
-                                </div>
-                                <div id="updateTextFileCurrent"
-                                    class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                    <p class="text-xs font-semibold text-gray-600 mb-2">Current File:</p>
-                                    <div id="updateTextFileInfo" class="flex items-center justify-between">
-                                        <span class="text-sm text-gray-500">Loading...</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Visual PDF -->
-                            <div id="updateVisualPdfContainer"
-                                class="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-blue-400 transition-colors">
-                                <div class="text-center mb-4">
-                                    <input type="file" id="inpUpdateVisualFile" accept=".pdf" class="hidden">
-                                    <label for="inpUpdateVisualFile" class="cursor-pointer">
-                                        <i class="fas fa-file-image text-4xl text-purple-500 mb-2"></i>
-                                        <p class="text-gray-700 font-medium mb-1">Visual PDF (for display) <span
-                                                class="text-gray-500 text-sm">(optional)</span></p>
-                                        <p class="text-sm text-gray-500">Replace the presentation PDF (will be converted
-                                            to WebP images)</p>
-                                    </label>
-                                    <div id="updateVisualFileName"
-                                        class="mt-2 text-purple-600 font-medium text-sm hidden"></div>
-                                </div>
-                                <div id="updateVisualFileCurrent"
-                                    class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                    <p class="text-xs font-semibold text-gray-600 mb-2">Current File:</p>
-                                    <div id="updateVisualFileInfo" class="flex items-center justify-between">
-                                        <span class="text-sm text-gray-500">Loading...</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Statements PDF -->
-                            <div
-                                class="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-blue-400 transition-colors">
-                                <div class="text-center mb-4">
-                                    <input type="file" id="inpUpdateStatementsFile" accept=".pdf" class="hidden">
-                                    <label for="inpUpdateStatementsFile" class="cursor-pointer">
-                                        <i class="fas fa-tasks text-4xl text-pink-500 mb-2"></i>
-                                        <p class="text-gray-700 font-medium mb-1">Exercise Statements PDF <span
-                                                class="text-gray-500 text-sm">(optional)</span></p>
-                                        <p class="text-sm text-gray-500">Replace the statements PDF for the coding lab
-                                        </p>
-                                    </label>
-                                    <div id="updateStatementsFileName"
-                                        class="mt-2 text-pink-500 font-medium text-sm hidden"></div>
-                                </div>
-                                <div id="updateStatementsFileCurrent"
-                                    class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                    <p class="text-xs font-semibold text-gray-600 mb-2">Current File:</p>
-                                    <div id="updateStatementsFileInfo" class="flex items-center justify-between">
-                                        <span class="text-sm text-gray-500">Loading...</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button type="button" id="btnUpdateChapter"
-                            class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-indigo-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                            <i class="fas fa-save mr-2"></i>
-                            Update Chapter
-                        </button>
-                        <div id="updateChapterResult" class="hidden mt-4"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Add Chapter Modal -->
-        <div id="addChapterModal"
-            class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                    <h3 class="text-2xl font-semibold text-gray-800">Add Chapter to Course</h3>
-                    <button id="closeAddChapterModal" class="text-gray-400 hover:text-gray-600 text-2xl">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="p-6">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 space-y-2">
-                        <p class="text-sm text-blue-800 flex items-center gap-2">
-                            <i class="fas fa-info-circle"></i>
-                            <span><strong>Required:</strong> Text PDF (for TTS) is always required for voice
-                                synthesis.</span>
-                        </p>
-                        <p class="text-sm text-blue-800 flex items-center gap-2">
-                            <i class="fas fa-video text-purple-500"></i>
-                            <span><strong>Video Link:</strong> If provided, the visual PDF input will be hidden. The
-                                video link replaces the presentation PDF.</span>
-                        </p>
-                        <p class="text-sm text-blue-800 flex items-center gap-2">
-                            <i class="fas fa-file-image text-purple-500"></i>
-                            <span><strong>Visual PDF:</strong> Required only when video link is not provided. Will be
-                                converted to WebP images.</span>
-                        </p>
-                    </div>
-
-                    <div class="space-y-4 mb-6">
-                        <div>
-                            <label for="inpVideoLink" class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-video text-purple-500 mr-2"></i>
-                                Video Link (optional)
-                            </label>
-                            <input type="url" id="inpVideoLink"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                placeholder="https://example.com/video.mp4" />
-                            <p class="text-xs text-gray-500 mt-1">If provided, the visual PDF input will be hidden</p>
-                        </div>
-                        <div>
-                            <label for="inpChapterName" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Chapter Name (optional)
-                            </label>
-                            <input type="text" id="inpChapterName" maxlength="150"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Leave empty to use PDF filename" />
-                        </div>
-                        <div>
-                            <label for="inpChapterDescription" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Chapter Description (optional)
-                            </label>
-                            <textarea id="inpChapterDescription" rows="2"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                placeholder="Brief description of this chapter..."></textarea>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div
-                            class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                            <input type="file" id="inpTextFile" accept=".pdf" class="hidden">
-                            <label for="inpTextFile" class="cursor-pointer">
-                                <i class="fas fa-file-alt text-4xl text-green-500 mb-2"></i>
-                                <p class="text-gray-700 font-medium mb-1">Text PDF (for TTS) <span
-                                        class="text-red-500">*</span></p>
-                                <p class="text-sm text-gray-500">PDF containing the full text content for voice
-                                    synthesis (required)</p>
-                            </label>
-                            <div id="textFileName" class="mt-2 text-green-600 font-medium text-sm hidden"></div>
-                        </div>
-
-                        <div id="visualPdfContainer"
-                            class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                            <input type="file" id="inpVisualFile" accept=".pdf" class="hidden">
-                            <label for="inpVisualFile" class="cursor-pointer">
-                                <i class="fas fa-file-image text-4xl text-purple-500 mb-2"></i>
-                                <p class="text-gray-700 font-medium mb-1">Presentation PDF (for display) <span
-                                        class="text-red-500">*</span></p>
-                                <p class="text-sm text-gray-500">PDF to be shown to users (will be converted to WebP
-                                    images)</p>
-                            </label>
-                            <div id="visualFileName" class="mt-2 text-purple-600 font-medium text-sm hidden"></div>
-                        </div>
-
-                    </div>
-
-                    <button type="button" id="btnUploadChapter"
-                        class="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                        disabled>
-                        <i class="fas fa-upload mr-2"></i>
-                        Upload Chapter
-                    </button>
-
-                    <div id="chapterUploadLoading" class="hidden mt-4">
-                        <div class="flex items-center justify-center">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-                            <span class="ml-3 text-gray-600">Processing PDF and converting to WebP...</span>
-                        </div>
-                    </div>
-
-                    <div id="chapterUploadResult"
-                        class="hidden mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <div class="flex items-center">
-                            <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                            <span class="text-green-700 font-medium">Chapter uploaded successfully!</span>
-                        </div>
-                        <div id="chapterUploadResultDetails" class="mt-2 text-sm text-gray-600"></div>
-                    </div>
-
-                    <div id="chapterUploadError" class="hidden mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <div class="flex items-center">
-                            <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
-                            <span class="text-red-700 font-medium">Upload failed</span>
-                        </div>
-                        <div id="chapterErrorMessage" class="mt-2 text-sm text-red-600"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Add Chapter Modal - Removed: Now in chapter-management.html -->
 
         <!-- Chapter Actions Modal -->
         <div id="chapterModal"
@@ -564,168 +263,7 @@
             </div>
         </div>
 
-        <!-- Final Project Management Modal -->
-        <div id="finalProjectModal"
-            class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                    <h3 id="finalProjectModalTitle" class="text-2xl font-semibold text-gray-800">Final Project Management</h3>
-                    <button id="closeFinalProjectModal" class="text-gray-400 hover:text-gray-600 text-2xl">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="p-6">
-                    <!-- Final Project Info Section -->
-                    <div id="finalProjectInfoSection" class="mb-6">
-                        <div id="noFinalProjectState" class="hidden">
-                            <p class="text-gray-600 mb-4">No final project exists for this course. Create one to add documents.</p>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Project Name <span class="text-red-500">*</span>
-                                    </label>
-                                    <input type="text" id="inpProjectName" maxlength="255"
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                        placeholder="Enter project name">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Project Description
-                                    </label>
-                                    <textarea id="inpProjectDescription" rows="3" maxlength="2000"
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                        placeholder="Enter project description"></textarea>
-                                </div>
-                                <button id="btnCreateFinalProject"
-                                    class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
-                                    Create Final Project
-                                </button>
-                            </div>
-                        </div>
-                        <div id="finalProjectExistsState" class="hidden">
-                            <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <h4 class="font-semibold text-green-800" id="displayProjectName"></h4>
-                                        <p class="text-sm text-green-600 mt-1" id="displayProjectDescription"></p>
-                                    </div>
-                                    <button id="btnEditFinalProject" class="text-orange-600 hover:text-orange-800">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="editFinalProjectForm" class="hidden space-y-4 mb-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Project Name <span class="text-red-500">*</span>
-                                    </label>
-                                    <input type="text" id="inpEditProjectName" maxlength="255"
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Project Description
-                                    </label>
-                                    <textarea id="inpEditProjectDescription" rows="3" maxlength="2000"
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"></textarea>
-                                </div>
-                                <div class="flex gap-3">
-                                    <button id="btnUpdateFinalProject"
-                                        class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                                        Update
-                                    </button>
-                                    <button id="btnCancelEditFinalProject"
-                                        class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors">
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Documents Section -->
-                    <div id="documentsSection" class="hidden">
-                        <div class="flex items-center justify-between mb-4">
-                            <h4 class="text-xl font-semibold text-gray-800">Documents</h4>
-                            <button id="btnAddDocument"
-                                class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
-                                <i class="fas fa-plus"></i>
-                                Add Document
-                            </button>
-                        </div>
-
-                        <!-- Add Document Form -->
-                        <div id="addDocumentForm" class="hidden bg-gray-50 rounded-lg p-4 mb-4 space-y-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    Document Name <span class="text-red-500">*</span>
-                                </label>
-                                <input type="text" id="inpDocumentName" maxlength="255"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="Enter document name">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    Document Description
-                                </label>
-                                <textarea id="inpDocumentDescription" rows="2" maxlength="1000"
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="Enter document description"></textarea>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    PDF File <span class="text-red-500">*</span>
-                                </label>
-                                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 transition-colors">
-                                    <input type="file" id="inpDocumentPdf" accept=".pdf" class="hidden">
-                                    <label for="inpDocumentPdf" class="cursor-pointer">
-                                        <i class="fas fa-file-pdf text-4xl text-red-500 mb-2"></i>
-                                        <p class="text-gray-700 font-medium mb-1">Click to select PDF file</p>
-                                        <p class="text-sm text-gray-500">Maximum file size: 50MB</p>
-                                    </label>
-                                    <div id="documentPdfPreview" class="hidden mt-4">
-                                        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between">
-                                            <div class="flex items-center gap-3">
-                                                <i class="fas fa-file-pdf text-red-500 text-2xl"></i>
-                                                <div>
-                                                    <p class="text-sm font-medium text-gray-800" id="documentPdfFileName"></p>
-                                                    <p class="text-xs text-gray-500" id="documentPdfFileSize"></p>
-                                                </div>
-                                            </div>
-                                            <button type="button" id="btnRemoveDocumentPdf" class="text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex gap-3">
-                                <button id="btnSaveDocument"
-                                    class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                                    Save Document
-                                </button>
-                                <button id="btnCancelAddDocument"
-                                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Documents List -->
-                        <div id="documentsList" class="space-y-3">
-                            <!-- Documents will be inserted here -->
-                        </div>
-                        <div id="documentsEmptyState" class="hidden text-center py-8">
-                            <i class="fas fa-file-pdf text-4xl text-gray-300 mb-2"></i>
-                            <p class="text-gray-500">No documents yet</p>
-                            <p class="text-gray-400 text-sm mt-1">Add a document to get started</p>
-                        </div>
-                    </div>
-
-                    <div id="finalProjectResult" class="hidden mt-4"></div>
-                </div>
-            </div>
-        </div>
+        <!-- Final Project Management Modal - Removed: Now in final-project-management.html -->
 
     </div>
 
@@ -866,389 +404,16 @@
             document.getElementById('courseDescriptionDisplay').textContent = course.courseDescription || 'No description';
 
             loadChapters(course.id);
-            loadFinalProject(course.id);
+            // Final project management moved to separate page
         }
 
         // Back to courses button
         document.getElementById('btnBackToCourses').addEventListener('click', showCoursesList);
 
-        // Add Course button
-        document.getElementById('btnAddCourse').addEventListener('click', () => {
-            currentEditingCourseId = null;
-            document.getElementById('createCourseModalTitle').textContent = 'Create New Course';
-            document.getElementById('btnCreateCourseText').textContent = 'Create Course';
-            document.getElementById('inpCourseName').value = '';
-            document.getElementById('inpCourseDescription').value = '';
-            document.getElementById('courseCreateResult').classList.add('hidden');
-            document.getElementById('createCourseModal').classList.remove('hidden');
-        });
-
         // Edit Course
         window.editCourse = async function (courseId) {
-            try {
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}`, {
-                    credentials: 'include'
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load course');
-                }
-
-                const course = await response.json();
-                currentEditingCourseId = courseId;
-
-                document.getElementById('createCourseModalTitle').textContent = 'Edit Course';
-                document.getElementById('btnCreateCourseText').textContent = 'Update Course';
-                document.getElementById('inpCourseName').value = course.courseName || '';
-                document.getElementById('inpCourseDescription').value = course.courseDescription || '';
-                document.getElementById('courseCreateResult').classList.add('hidden');
-
-                document.getElementById('createCourseModal').classList.remove('hidden');
-            } catch (error) {
-                alert('Error loading course: ' + error.message);
-            }
+            window.location.href = `/course-management.html?courseId=${courseId}&mode=edit`;
         };
-
-        // Close Create Course Modal
-        document.getElementById('closeCreateCourseModal').addEventListener('click', () => {
-            // Reset form when closing
-            document.getElementById('inpCourseName').value = '';
-            document.getElementById('inpCourseDescription').value = '';
-            document.getElementById('inpCourseImage').value = '';
-            document.getElementById('courseImagePreview').classList.add('hidden');
-            document.getElementById('createCourseModal').classList.add('hidden');
-            currentEditingCourseId = null;
-        });
-
-        // Add Chapter button
-        document.getElementById('btnAddChapter').addEventListener('click', () => {
-            if (!currentCourseId) {
-                alert('Please select a course first');
-                return;
-            }
-            document.getElementById('addChapterModal').classList.remove('hidden');
-        });
-
-        // Close Add Chapter Modal
-        document.getElementById('closeAddChapterModal').addEventListener('click', () => {
-            // Reset form when closing
-            document.getElementById('inpTextFile').value = '';
-            document.getElementById('inpVisualFile').value = '';
-            document.getElementById('inpVideoLink').value = '';
-            document.getElementById('inpChapterName').value = '';
-            document.getElementById('inpChapterDescription').value = '';
-            ['textFileName', 'visualFileName'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-            });
-            // Reset visual PDF visibility
-            document.getElementById('visualPdfContainer').classList.remove('hidden');
-            document.getElementById('btnUploadChapter').disabled = true;
-            document.getElementById('addChapterModal').classList.add('hidden');
-        });
-
-        // Course image preview
-        document.getElementById('inpCourseImage').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            const preview = document.getElementById('courseImagePreview');
-            const previewImg = document.getElementById('courseImagePreviewImg');
-
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    previewImg.src = e.target.result;
-                    preview.classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            } else {
-                preview.classList.add('hidden');
-            }
-        });
-
-        // Create Course
-        document.getElementById('btnCreateCourse').addEventListener('click', async () => {
-            const courseName = document.getElementById('inpCourseName').value.trim();
-            const courseDescription = document.getElementById('inpCourseDescription').value.trim();
-            const courseImageFile = document.getElementById('inpCourseImage').files[0];
-
-            if (!courseName) {
-                showCourseError('Please provide a course name.');
-                return;
-            }
-
-            if (!courseDescription) {
-                showCourseError('Please provide a course description.');
-                return;
-            }
-
-            const btn = document.getElementById('btnCreateCourse');
-            btn.disabled = true;
-            const resultDiv = document.getElementById('courseCreateResult');
-            resultDiv.classList.add('hidden');
-
-            try {
-                let response;
-                const formData = new FormData();
-                formData.append('courseName', courseName);
-                formData.append('courseDescription', courseDescription);
-
-                if (courseImageFile) {
-                    formData.append('courseImage', courseImageFile);
-                }
-
-                if (currentEditingCourseId) {
-                    // Update existing course
-                    if (courseImageFile) {
-                        formData.append('courseImage', courseImageFile);
-                    }
-                    response = await fetch(`${API_BASE}/api/courses/${currentEditingCourseId}`, {
-                        method: 'PUT',
-                        credentials: 'include',
-                        body: formData
-                    });
-                } else {
-                    // Create new course
-                    response = await fetch(`${API_BASE}/api/courses`, {
-                        method: 'POST',
-                        credentials: 'include',
-                        body: formData
-                    });
-                }
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || `Failed to ${currentEditingCourseId ? 'update' : 'create'} course`);
-                }
-
-                resultDiv.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
-                resultDiv.innerHTML = `
-                    <div class="flex items-center">
-                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                        <span class="text-green-700 font-medium">Course ${currentEditingCourseId ? 'updated' : 'created'} successfully!</span>
-                    </div>
-                    ${!currentEditingCourseId ? `
-                    <div class="mt-2 text-sm text-gray-600">
-                        <strong>Course ID:</strong> ${data.courseId}<br>
-                        <strong>Name:</strong> ${escapeHtml(data.courseName)}
-                    </div>
-                    ` : ''}
-                `;
-                resultDiv.classList.remove('hidden');
-
-                // Clear form only if creating new course
-                if (!currentEditingCourseId) {
-                    document.getElementById('inpCourseName').value = '';
-                    document.getElementById('inpCourseDescription').value = '';
-                    document.getElementById('inpCourseImage').value = '';
-                    document.getElementById('courseImagePreview').classList.add('hidden');
-                }
-
-                // Refresh courses list and close modal after a delay
-                setTimeout(() => {
-                    document.getElementById('createCourseModal').classList.add('hidden');
-                    currentEditingCourseId = null;
-                    loadCourses();
-                }, 2000);
-            } catch (error) {
-                showCourseError(error.message);
-            } finally {
-                btn.disabled = false;
-            }
-        });
-
-        function showCourseError(message) {
-            const resultDiv = document.getElementById('courseCreateResult');
-            resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
-            resultDiv.innerHTML = `
-                <div class="flex items-center">
-                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
-                    <span class="text-red-700 font-medium">${escapeHtml(message)}</span>
-                </div>
-            `;
-            resultDiv.classList.remove('hidden');
-        }
-
-        // File input handlers
-        const fileInputMap = {
-            'inpTextFile': 'textFileName',
-            'inpVisualFile': 'visualFileName'
-        };
-
-        Object.entries(fileInputMap).forEach(([inputId, displayId]) => {
-            const input = document.getElementById(inputId);
-            const display = document.getElementById(displayId);
-
-            if (!input || !display) {
-                console.warn(`Missing element: ${inputId} or ${displayId}`);
-                return;
-            }
-
-            input.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    const file = e.target.files[0];
-                    display.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-                    display.classList.remove('hidden');
-                } else {
-                    display.classList.add('hidden');
-                }
-                checkChapterUploadReady();
-            });
-        });
-
-        function toggleVisualPdfInput() {
-            const videoLink = document.getElementById('inpVideoLink')?.value.trim();
-            const hasVideoLink = videoLink && videoLink.length > 0;
-            const visualPdfContainer = document.getElementById('visualPdfContainer');
-
-            if (hasVideoLink) {
-                // Hide visual PDF input when video link is provided
-                visualPdfContainer.classList.add('hidden');
-                // Clear visual file if it was selected
-                document.getElementById('inpVisualFile').value = '';
-                document.getElementById('visualFileName').classList.add('hidden');
-            } else {
-                // Show visual PDF input when video link is empty
-                visualPdfContainer.classList.remove('hidden');
-            }
-
-            checkChapterUploadReady();
-        }
-
-        function checkChapterUploadReady() {
-            const videoLink = document.getElementById('inpVideoLink')?.value.trim();
-            const hasVideoLink = videoLink && videoLink.length > 0;
-            const hasTextFile = document.getElementById('inpTextFile').files.length > 0;
-            const hasVisualFile = document.getElementById('inpVisualFile').files.length > 0;
-
-            // Text PDF is always required
-            // Visual PDF is required only when video link is not provided
-            const isReady = hasTextFile && (hasVideoLink || hasVisualFile);
-            document.getElementById('btnUploadChapter').disabled = !isReady;
-        }
-
-        // Add event listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            const videoLinkInput = document.getElementById('inpVideoLink');
-            if (videoLinkInput) {
-                videoLinkInput.addEventListener('input', toggleVisualPdfInput);
-            }
-
-            // Also check when files are selected
-            document.getElementById('inpTextFile').addEventListener('change', checkChapterUploadReady);
-            document.getElementById('inpVisualFile').addEventListener('change', checkChapterUploadReady);
-        });
-
-        // Upload Chapter
-        document.getElementById('btnUploadChapter').addEventListener('click', async () => {
-            if (!currentCourseId) {
-                showChapterError('No course selected.');
-                return;
-            }
-
-            const videoLink = document.getElementById('inpVideoLink')?.value.trim();
-            const hasVideoLink = videoLink && videoLink.length > 0;
-            const hasTextFile = document.getElementById('inpTextFile').files[0];
-            const hasVisualFile = document.getElementById('inpVisualFile').files[0];
-
-            // Text PDF is always required
-            if (!hasTextFile) {
-                showChapterError('Text PDF file is required (for TTS)');
-                return;
-            }
-
-            // Visual PDF is required only when video link is not provided
-            if (!hasVideoLink && !hasVisualFile) {
-                showChapterError('Please provide either a video link or a visual PDF file');
-                return;
-            }
-
-            const chapterName = document.getElementById('inpChapterName').value.trim();
-            const chapterDescription = document.getElementById('inpChapterDescription').value.trim();
-
-            const loading = document.getElementById('chapterUploadLoading');
-            const result = document.getElementById('chapterUploadResult');
-            const error = document.getElementById('chapterUploadError');
-            const btn = document.getElementById('btnUploadChapter');
-
-            result.classList.add('hidden');
-            error.classList.add('hidden');
-            loading.classList.remove('hidden');
-            btn.disabled = true;
-
-            const formData = new FormData();
-
-            // Add video link if provided
-            if (videoLink) {
-                formData.append('video_link', videoLink);
-            }
-
-            // Add PDF files only if they exist (optional when video link is provided)
-            if (document.getElementById('inpTextFile').files[0]) {
-                formData.append('textPdfFile', document.getElementById('inpTextFile').files[0]);
-            }
-            if (document.getElementById('inpVisualFile').files[0]) {
-                formData.append('visualPdfFile', document.getElementById('inpVisualFile').files[0]);
-            }
-            if (chapterName) formData.append('chapterName', chapterName);
-            if (chapterDescription) formData.append('chapterDescription', chapterDescription);
-
-            try {
-                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/chapters`, {
-                    method: 'POST',
-                    credentials: 'include', // Include session cookie
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Upload failed');
-                }
-
-                loading.classList.add('hidden');
-                result.classList.remove('hidden');
-
-                const detailsHtml = `
-                    <strong>Chapter ID:</strong> ${data.chapterId}<br>
-                    <strong>Chapter Name:</strong> ${escapeHtml(data.chapterName)}<br>
-                    <strong>Text PDF:</strong> ${data.textFilename || 'N/A'}<br>
-                    <strong>Visual PDF:</strong> ${data.visualFilename || 'N/A'}<br>
-                    <strong>Text Pages:</strong> ${data.numPagesText || 0}<br>
-                    <strong>Visual Pages:</strong> ${data.numPagesVisual || 0}<br>
-                    <strong>WebP Images:</strong> ${data.webpImages?.length || 0} images generated
-                `;
-
-                document.getElementById('chapterUploadResultDetails').innerHTML = detailsHtml;
-
-                // Clear form
-                document.getElementById('inpTextFile').value = '';
-                document.getElementById('inpVisualFile').value = '';
-                document.getElementById('inpVideoLink').value = '';
-                document.getElementById('inpChapterName').value = '';
-                document.getElementById('inpChapterDescription').value = '';
-                ['textFileName', 'visualFileName'].forEach(id => {
-                    document.getElementById(id).classList.add('hidden');
-                });
-                // Reset visual PDF visibility
-                document.getElementById('visualPdfContainer').classList.remove('hidden');
-                btn.disabled = true;
-
-                // Refresh chapters list and close modal after a delay
-                setTimeout(() => {
-                    document.getElementById('addChapterModal').classList.add('hidden');
-                    loadChapters(currentCourseId);
-                }, 2000);
-            } catch (error) {
-                loading.classList.add('hidden');
-                showChapterError(error.message);
-                btn.disabled = false;
-            }
-        });
-
-        function showChapterError(message) {
-            document.getElementById('chapterErrorMessage').textContent = message;
-            document.getElementById('chapterUploadError').classList.remove('hidden');
-        }
 
         // Load Courses
         async function loadCourses() {
@@ -1367,65 +532,73 @@
                     : null;
 
                 return `
-                <div class="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-md card-hover border border-gray-200 cursor-pointer overflow-hidden" onclick="viewCourse('${course.id}')">
-                    ${imageUrl ? `
-                        <div class="w-full h-48 overflow-hidden bg-gray-200">
-                            <img 
-                                src="${imageUrl}" 
-                                alt="${escapeHtml(course.courseName)}" 
-                                class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                            />
-                            <div class="w-full h-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center" style="display: none;">
-                                <i class="fas fa-graduation-cap text-white text-6xl opacity-50"></i>
-                            </div>
-                        </div>
-                    ` : `
-                        <div class="w-full h-48 bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center">
-                            <i class="fas fa-graduation-cap text-white text-6xl opacity-50"></i>
-                        </div>
-                    `}
-                    <div class="p-6">
-                        <div class="flex items-start justify-between mb-4">
-                            <div class="flex-1 pr-4">
-                                <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-1">Course</p>
-                                <h3 class="text-xl font-semibold text-gray-800 mb-2">
-                                    <i class="fas fa-graduation-cap text-blue-500 mr-2"></i>
-                                    ${escapeHtml(course.courseName)}
-                                </h3>
-                                <p class="text-sm text-gray-500 mb-1">
-                                    <i class="fas fa-hashtag text-gray-400 mr-1"></i>
-                                    ${course.id.substring(0, 8)}...
-                                </p>
-                                <p class="text-sm text-gray-500">
-                                    <i class="fas fa-book-open text-gray-400 mr-1"></i>
-                                    ${course.chaptersCount || 0} chapter${course.chaptersCount !== 1 ? 's' : ''}
-                                </p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <button
-                                    onclick="event.stopPropagation(); editCourse('${course.id}')"
-                                    class="text-indigo-500 hover:text-indigo-600 text-sm font-semibold flex items-center gap-1"
-                                    title="Edit course"
-                                >
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button
-                                    onclick="event.stopPropagation(); deleteCourse('${course.id}')"
-                                    class="text-red-500 hover:text-red-600 text-sm font-semibold flex items-center gap-1"
-                                    title="Delete course"
-                                >
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer" onclick="viewCourse('${course.id}')">
+                    <div class="flex items-center gap-4 p-4">
+                        <!-- Course Image/Icon -->
+                        <div class="flex-shrink-0">
+                            ${imageUrl ? `
+                                <div class="w-20 h-20 rounded-lg overflow-hidden bg-gray-200">
+                                    <img 
+                                        src="${imageUrl}" 
+                                        alt="${escapeHtml(course.courseName)}" 
+                                        class="w-full h-full object-cover"
+                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                    />
+                                    <div class="w-full h-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center" style="display: none;">
+                                        <i class="fas fa-graduation-cap text-white text-2xl"></i>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="w-20 h-20 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center">
+                                    <i class="fas fa-graduation-cap text-white text-2xl"></i>
+                                </div>
+                            `}
                         </div>
 
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-3">
-                            ${escapeHtml(course.courseDescription || 'No description provided.')}
-                        </p>
-
-                        <div class="flex items-center justify-between pt-4 border-t border-gray-200">
-                            <span class="text-sm text-blue-600 font-medium">Click to view chapters →</span>
+                        <!-- Course Info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-lg font-semibold text-gray-800 mb-1 truncate">
+                                        <i class="fas fa-graduation-cap text-blue-500 mr-2"></i>
+                                        ${escapeHtml(course.courseName)}
+                                    </h3>
+                                    <p class="text-sm text-gray-600 mb-2 line-clamp-2">
+                                        ${escapeHtml(course.courseDescription || 'No description provided.')}
+                                    </p>
+                                    <div class="flex items-center gap-4 text-xs text-gray-500">
+                                        <span>
+                                            <i class="fas fa-hashtag text-gray-400 mr-1"></i>
+                                            ${course.id.substring(0, 8)}...
+                                        </span>
+                                        <span>
+                                            <i class="fas fa-book-open text-gray-400 mr-1"></i>
+                                            ${course.chaptersCount || 0} chapter${course.chaptersCount !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                        onclick="event.stopPropagation(); editCourse('${course.id}')"
+                                        class="text-indigo-500 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 transition-colors"
+                                        title="Edit course"
+                                    >
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button
+                                        onclick="event.stopPropagation(); deleteCourse('${course.id}')"
+                                        class="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                        title="Delete course"
+                                    >
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                    <span class="text-blue-600 text-sm font-medium ml-2">
+                                        View →
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1481,106 +654,133 @@
         function renderChapters(chapters) {
             const grid = document.getElementById('chaptersGrid');
             grid.innerHTML = chapters.map(chapter => `
-                <div class="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-md card-hover p-6 border border-gray-200">
-                    <div class="flex items-start justify-between mb-4">
-                        <div class="flex-1 pr-4">
-                            <p class="text-xs font-semibold text-purple-500 uppercase tracking-wide mb-1">Chapter</p>
-                            <h3 class="text-lg font-semibold text-gray-800 mb-2">
-                                <i class="fas fa-file-alt text-purple-500 mr-2"></i>
-                                ${escapeHtml(chapter.chapterName)}
-                            </h3>
-                            <p class="text-sm text-gray-500 mb-1">
-                                <i class="fas fa-hashtag text-gray-400 mr-1"></i>
-                                ${chapter.id.substring(0, 8)}...
-                            </p>
-                            <p class="text-sm text-gray-500">
-                                <i class="fas fa-file-pdf text-gray-400 mr-1"></i>
-                                ${chapter.numPagesVisual || 0} pages
-                                ${chapter.statementsCount > 0 ? ` • ${chapter.statementsCount} statements` : ''}
-                            </p>
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-4 p-4">
+                        <!-- Chapter Icon -->
+                        <div class="flex-shrink-0">
+                            <div class="w-16 h-16 rounded-lg bg-gradient-to-br from-purple-400 to-pink-600 flex items-center justify-center">
+                                <i class="fas fa-file-alt text-white text-xl"></i>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button
-                                onclick="event.stopPropagation(); editChapter('${currentCourseId}', '${chapter.id}')"
-                                class="text-indigo-500 hover:text-indigo-600 text-sm font-semibold flex items-center gap-1"
-                                title="Edit chapter"
-                            >
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button
-                                onclick="event.stopPropagation(); deleteChapter('${currentCourseId}', '${chapter.id}')"
-                                class="text-red-500 hover:text-red-600 text-sm font-semibold flex items-center gap-1"
-                                title="Delete chapter"
-                            >
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </div>
 
-                    ${chapter.chapterDescription ? `
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">
-                            ${escapeHtml(chapter.chapterDescription)}
-                        </p>
-                    ` : ''}
-                    
-                    ${chapter.videoLink ? `
-                        <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                            <p class="text-xs font-semibold text-purple-600 mb-1">
-                                <i class="fas fa-video mr-1"></i>Video Link
-                            </p>
-                            <a href="${escapeHtml(chapter.videoLink)}" target="_blank" class="text-sm text-purple-700 hover:underline break-all">
-                                ${escapeHtml(chapter.videoLink)}
-                            </a>
+                        <!-- Chapter Info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-lg font-semibold text-gray-800 mb-1 truncate">
+                                        <i class="fas fa-file-alt text-purple-500 mr-2"></i>
+                                        ${escapeHtml(chapter.chapterName)}
+                                    </h3>
+                                    ${chapter.chapterDescription ? `
+                                        <p class="text-sm text-gray-600 mb-2 line-clamp-1">
+                                            ${escapeHtml(chapter.chapterDescription)}
+                                        </p>
+                                    ` : ''}
+                                    <div class="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                                        <span>
+                                            <i class="fas fa-hashtag text-gray-400 mr-1"></i>
+                                            ${chapter.id.substring(0, 8)}...
+                                        </span>
+                                        <span>
+                                            <i class="fas fa-file-pdf text-gray-400 mr-1"></i>
+                                            ${chapter.numPagesVisual || 0} pages
+                                        </span>
+                                        ${chapter.statementsCount > 0 ? `
+                                            <span>
+                                                <i class="fas fa-list text-gray-400 mr-1"></i>
+                                                ${chapter.statementsCount} statements
+                                            </span>
+                                        ` : ''}
+                                        ${chapter.videoLink ? `
+                                            <span class="text-purple-600">
+                                                <i class="fas fa-video mr-1"></i>
+                                                Video
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                    
+                                    <!-- Action Buttons Row -->
+                                    <div class="flex flex-wrap items-center gap-2 mt-2">
+                                        <button 
+                                            onclick="viewChapter('${currentCourseId}', '${chapter.id}', '${encodeURIComponent(chapter.chapterName)}')" 
+                                            class="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
+                                        >
+                                            <i class="fas fa-eye"></i>
+                                            View
+                                        </button>
+                                        <button 
+                                            onclick="chapterSummary('${currentCourseId}', '${chapter.id}')" 
+                                            class="bg-purple-500 hover:bg-purple-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
+                                        >
+                                            <i class="fas fa-file-alt"></i>
+                                            Summary
+                                        </button>
+                                        ${chapter.hasTTS || chapter.hasPageAudio ? `
+                                        <button 
+                                            onclick="regenerateChapterTTS('${currentCourseId}', '${chapter.id}')" 
+                                            class="bg-teal-500 hover:bg-teal-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
+                                            title="Delete old TTS and regenerate"
+                                        >
+                                            <i class="fas fa-redo"></i>
+                                            Regenerate TTS
+                                        </button>
+                                        ` : `
+                                        <button 
+                                            onclick="chapterTTS('${currentCourseId}', '${chapter.id}')" 
+                                            class="bg-green-500 hover:bg-green-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
+                                        >
+                                            <i class="fas fa-volume-up"></i>
+                                            TTS
+                                        </button>
+                                        `}
+                                        ${chapter.hasLipSync ? `
+                                        <button 
+                                            onclick="regenerateChapterLipSync('${currentCourseId}', '${chapter.id}')" 
+                                            class="bg-amber-500 hover:bg-amber-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
+                                            title="Delete old lip sync and regenerate"
+                                        >
+                                            <i class="fas fa-redo"></i>
+                                            Regenerate Lip Sync
+                                        </button>
+                                        ` : `
+                                        <button 
+                                            onclick="chapterLipSync('${currentCourseId}', '${chapter.id}')" 
+                                            class="bg-orange-500 hover:bg-orange-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
+                                        >
+                                            <i class="fas fa-wave-square"></i>
+                                            Lip Sync
+                                        </button>
+                                        `}
+                                        <button 
+                                            onclick="window.location.href='/quiz-management.html?courseId=${currentCourseId}&chapterId=${chapter.id}&chapterName=${encodeURIComponent(chapter.chapterName)}'" 
+                                            class="bg-purple-600 hover:bg-purple-700 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
+                                            title="Manage quiz questions"
+                                        >
+                                            <i class="fas fa-question-circle"></i>
+                                            Quiz
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                        onclick="event.stopPropagation(); window.location.href='/chapter-management.html?courseId=${currentCourseId}&chapterId=${chapter.id}&mode=edit'"
+                                        class="text-indigo-500 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 transition-colors"
+                                        title="Edit chapter"
+                                    >
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button
+                                        onclick="event.stopPropagation(); deleteChapter('${currentCourseId}', '${chapter.id}')"
+                                        class="text-red-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                                        title="Delete chapter"
+                                    >
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    ` : ''}
-                    
-                    <div class="flex flex-wrap gap-2 mt-4">
-                        <button 
-                            onclick="viewChapter('${currentCourseId}', '${chapter.id}', '${encodeURIComponent(chapter.chapterName)}')" 
-                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                        >
-                            <i class="fas fa-eye mr-1"></i>
-                            View
-                        </button>
-                        <button 
-                            onclick="chapterSummary('${currentCourseId}', '${chapter.id}')" 
-                            class="flex-1 bg-purple-500 hover:bg-purple-600 text-white text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                        >
-                            <i class="fas fa-file-alt mr-1"></i>
-                            Summary
-                        </button>
-                        <button 
-                            onclick="chapterTTS('${currentCourseId}', '${chapter.id}')" 
-                            class="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                        >
-                            <i class="fas fa-volume-up mr-1"></i>
-                            TTS
-                        </button>
-                        <button 
-                            onclick="chapterLipSync('${currentCourseId}', '${chapter.id}')" 
-                            class="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                        >
-                            <i class="fas fa-wave-square mr-1"></i>
-                            Lip Sync
-                        </button>
-                    </div>
-                    <div class="flex flex-wrap gap-2 mt-2">
-                        <button 
-                            onclick="regenerateChapterTTS('${currentCourseId}', '${chapter.id}')" 
-                            class="flex-1 bg-teal-500 hover:bg-teal-600 text-white text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                            title="Delete old TTS and regenerate"
-                        >
-                            <i class="fas fa-redo mr-1"></i>
-                            Regenerate TTS
-                        </button>
-                        <button 
-                            onclick="regenerateChapterLipSync('${currentCourseId}', '${chapter.id}')" 
-                            class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                            title="Delete old lip sync and regenerate"
-                        >
-                            <i class="fas fa-redo mr-1"></i>
-                            Regenerate Lip Sync
-                        </button>
                     </div>
                 </div>
             `).join('');
@@ -1624,273 +824,10 @@
             }
         };
 
-        // Edit Chapter
+        // Edit Chapter - redirects to chapter management page
         window.editChapter = async function (courseId, chapterId) {
-            try {
-                // Load chapter data
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}`, {
-                    credentials: 'include'
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load chapter data');
-                }
-
-                const chapter = await response.json();
-
-                // Populate form
-                document.getElementById('inpUpdateChapterName').value = chapter.chapterName || '';
-                document.getElementById('inpUpdateChapterDescription').value = chapter.chapterDescription || '';
-                document.getElementById('inpUpdateVideoLink').value = chapter.videoLink || '';
-
-                // Show current PDF files with view/download options
-                const textFileInfo = document.getElementById('updateTextFileInfo');
-                const visualFileInfo = document.getElementById('updateVisualFileInfo');
-                const statementsFileInfo = document.getElementById('updateStatementsFileInfo');
-
-                // Text PDF
-                if (chapter.textFilename) {
-                    const textFileUrl = `${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/file?type=text`;
-                    textFileInfo.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-pdf text-green-500"></i>
-                            <span class="text-sm text-gray-700">${escapeHtml(chapter.textFilename)}</span>
-                            ${chapter.numPagesText ? `<span class="text-xs text-gray-500">(${chapter.numPagesText} pages)</span>` : ''}
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <a href="${textFileUrl}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1" title="View PDF">
-                                <i class="fas fa-eye"></i> View
-                            </a>
-                            <a href="${textFileUrl}" download class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1" title="Download PDF">
-                                <i class="fas fa-download"></i> Download
-                            </a>
-                        </div>
-                    `;
-                } else {
-                    textFileInfo.innerHTML = '<span class="text-sm text-gray-400 italic">No text PDF file</span>';
-                }
-
-                // Visual PDF
-                if (chapter.visualFilename) {
-                    const visualFileUrl = `${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/file?type=visual`;
-                    visualFileInfo.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-pdf text-purple-500"></i>
-                            <span class="text-sm text-gray-700">${escapeHtml(chapter.visualFilename)}</span>
-                            ${chapter.numPagesVisual ? `<span class="text-xs text-gray-500">(${chapter.numPagesVisual} pages)</span>` : ''}
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <a href="${visualFileUrl}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1" title="View PDF">
-                                <i class="fas fa-eye"></i> View
-                            </a>
-                            <a href="${visualFileUrl}" download class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1" title="Download PDF">
-                                <i class="fas fa-download"></i> Download
-                            </a>
-                        </div>
-                    `;
-                } else {
-                    visualFileInfo.innerHTML = '<span class="text-sm text-gray-400 italic">No visual PDF file</span>';
-                }
-
-                // Statements PDF
-                if (chapter.statementsFilename) {
-                    const statementsFileUrl = `${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/file?type=statements`;
-                    statementsFileInfo.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-file-pdf text-pink-500"></i>
-                            <span class="text-sm text-gray-700">${escapeHtml(chapter.statementsFilename)}</span>
-                            ${chapter.numPagesStatements ? `<span class="text-xs text-gray-500">(${chapter.numPagesStatements} pages)</span>` : ''}
-                            ${chapter.statementsCount ? `<span class="text-xs text-gray-500">(${chapter.statementsCount} statements)</span>` : ''}
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <a href="${statementsFileUrl}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1" title="View PDF">
-                                <i class="fas fa-eye"></i> View
-                            </a>
-                            <a href="${statementsFileUrl}" download class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1" title="Download PDF">
-                                <i class="fas fa-download"></i> Download
-                            </a>
-                        </div>
-                    `;
-                } else {
-                    statementsFileInfo.innerHTML = '<span class="text-sm text-gray-400 italic">No statements PDF file</span>';
-                }
-
-                // Show/hide visual PDF container based on video link
-                const visualPdfContainer = document.getElementById('updateVisualPdfContainer');
-                if (chapter.videoLink) {
-                    visualPdfContainer.classList.add('hidden');
-                } else {
-                    visualPdfContainer.classList.remove('hidden');
-                }
-
-                // Clear file inputs
-                document.getElementById('inpUpdateTextFile').value = '';
-                document.getElementById('inpUpdateVisualFile').value = '';
-                document.getElementById('inpUpdateStatementsFile').value = '';
-                ['updateTextFileName', 'updateVisualFileName', 'updateStatementsFileName'].forEach(id => {
-                    document.getElementById(id).classList.add('hidden');
-                });
-
-                // Store current chapter ID for update
-                document.getElementById('updateChapterModal').setAttribute('data-course-id', courseId);
-                document.getElementById('updateChapterModal').setAttribute('data-chapter-id', chapterId);
-
-                // Show modal
-                document.getElementById('updateChapterModal').classList.remove('hidden');
-            } catch (error) {
-                alert(`Error: ${error.message}`);
-            }
+            window.location.href = `/chapter-management.html?courseId=${courseId}&chapterId=${chapterId}&mode=edit`;
         };
-
-        // Close Update Chapter Modal
-        document.getElementById('closeUpdateChapterModal').addEventListener('click', () => {
-            document.getElementById('updateChapterModal').classList.add('hidden');
-            document.getElementById('inpUpdateChapterName').value = '';
-            document.getElementById('inpUpdateChapterDescription').value = '';
-            document.getElementById('inpUpdateVideoLink').value = '';
-            document.getElementById('inpUpdateTextFile').value = '';
-            document.getElementById('inpUpdateVisualFile').value = '';
-            document.getElementById('inpUpdateStatementsFile').value = '';
-            ['updateTextFileName', 'updateVisualFileName', 'updateStatementsFileName'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-            });
-            document.getElementById('updateChapterResult').classList.add('hidden');
-        });
-
-        // File input handlers for update chapter
-        const updateFileInputMap = {
-            'inpUpdateTextFile': 'updateTextFileName',
-            'inpUpdateVisualFile': 'updateVisualFileName',
-            'inpUpdateStatementsFile': 'updateStatementsFileName'
-        };
-
-        Object.entries(updateFileInputMap).forEach(([inputId, displayId]) => {
-            const input = document.getElementById(inputId);
-            const display = document.getElementById(displayId);
-
-            if (input && display) {
-                input.addEventListener('change', (e) => {
-                    if (e.target.files.length > 0) {
-                        const file = e.target.files[0];
-                        display.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-                        display.classList.remove('hidden');
-                    } else {
-                        display.classList.add('hidden');
-                    }
-                });
-            }
-        });
-
-        // Toggle visual PDF input based on video link
-        const inpUpdateVideoLink = document.getElementById('inpUpdateVideoLink');
-        if (inpUpdateVideoLink) {
-            inpUpdateVideoLink.addEventListener('input', () => {
-                const videoLink = inpUpdateVideoLink.value.trim();
-                const visualPdfContainer = document.getElementById('updateVisualPdfContainer');
-                if (videoLink && videoLink.length > 0) {
-                    visualPdfContainer.classList.add('hidden');
-                    document.getElementById('inpUpdateVisualFile').value = '';
-                    document.getElementById('updateVisualFileName').classList.add('hidden');
-                } else {
-                    visualPdfContainer.classList.remove('hidden');
-                }
-            });
-        }
-
-        // Update Chapter
-        document.getElementById('btnUpdateChapter').addEventListener('click', async () => {
-            const modal = document.getElementById('updateChapterModal');
-            const courseId = modal.getAttribute('data-course-id');
-            const chapterId = modal.getAttribute('data-chapter-id');
-
-            if (!courseId || !chapterId) {
-                alert('Error: Course or chapter ID not found');
-                return;
-            }
-
-            const chapterName = document.getElementById('inpUpdateChapterName').value.trim();
-            const chapterDescription = document.getElementById('inpUpdateChapterDescription').value.trim();
-            const videoLink = document.getElementById('inpUpdateVideoLink').value.trim();
-            const textPdfFile = document.getElementById('inpUpdateTextFile').files[0];
-            const visualPdfFile = document.getElementById('inpUpdateVisualFile').files[0];
-            const statementsPdfFile = document.getElementById('inpUpdateStatementsFile').files[0];
-
-            if (!chapterName) {
-                showUpdateChapterError('Please provide a chapter name.');
-                return;
-            }
-
-            const btn = document.getElementById('btnUpdateChapter');
-            btn.disabled = true;
-            const resultDiv = document.getElementById('updateChapterResult');
-            resultDiv.classList.add('hidden');
-
-            try {
-                // Use FormData to support file uploads
-                const formData = new FormData();
-                formData.append('chapterName', chapterName);
-                formData.append('chapterDescription', chapterDescription || '');
-                formData.append('videoLink', videoLink || '');
-
-                if (textPdfFile) {
-                    formData.append('textPdfFile', textPdfFile);
-                }
-                if (visualPdfFile) {
-                    formData.append('visualPdfFile', visualPdfFile);
-                }
-                if (statementsPdfFile) {
-                    formData.append('statementsPdfFile', statementsPdfFile);
-                }
-
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}`, {
-                    method: 'PUT',
-                    credentials: 'include',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to update chapter');
-                }
-
-                resultDiv.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
-                resultDiv.innerHTML = `
-                    <div class="flex items-center">
-                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                        <span class="text-green-700 font-medium">Chapter updated successfully!</span>
-                    </div>
-                    ${textPdfFile || visualPdfFile || statementsPdfFile ? `
-                    <div class="mt-2 text-sm text-gray-600">
-                        <p>PDF files are being processed. This may take a moment...</p>
-                    </div>
-                    ` : ''}
-                `;
-                resultDiv.classList.remove('hidden');
-
-                // Refresh chapters list and close modal after a delay
-                setTimeout(() => {
-                    document.getElementById('updateChapterModal').classList.add('hidden');
-                    loadChapters(courseId);
-                }, 2000);
-            } catch (error) {
-                showUpdateChapterError(error.message);
-            } finally {
-                btn.disabled = false;
-            }
-        });
-
-        function showUpdateChapterError(message) {
-            const resultDiv = document.getElementById('updateChapterResult');
-            resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
-            resultDiv.innerHTML = `
-                <div class="flex items-center">
-                    <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
-                    <span class="text-red-700 font-medium">${escapeHtml(message)}</span>
-                </div>
-            `;
-            resultDiv.classList.remove('hidden');
-        }
 
         // View Chapter
         window.viewChapter = async function (courseId, chapterId, encodedName) {
@@ -2007,6 +944,10 @@
                             </div>
                         </div>
                     `;
+                    // Reload chapters to update button states
+                    if (currentCourseId) {
+                        loadChapters(currentCourseId);
+                    }
                 } else {
                     throw new Error(data.error || 'Failed to generate audio');
                 }
@@ -2054,6 +995,10 @@
                         </div>
                     </div>
                 `;
+                // Reload chapters to update button states
+                if (currentCourseId) {
+                    loadChapters(currentCourseId);
+                }
             } catch (error) {
                 document.getElementById('modalContent').innerHTML = `
                     <div class="text-center py-8">
@@ -2066,14 +1011,14 @@
 
         // Regenerate Chapter TTS
         window.regenerateChapterTTS = async function (courseId, chapterId) {
-            if (!confirm('This will delete all existing TTS audio files (main audio and page audios) and regenerate them. Continue?')) {
+            if (!confirm('This will delete all existing TTS audio files (main audio and page audios) and regenerate them. This may take several minutes. Continue?')) {
                 return;
             }
 
             currentCourseId = courseId;
             currentChapterId = chapterId;
             document.getElementById('modalTitle').textContent = 'Regenerating TTS';
-            document.getElementById('modalContent').innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div><p class="mt-4 text-gray-600">Deleting old audio files and regenerating TTS...</p></div>';
+            document.getElementById('modalContent').innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div><p class="mt-4 text-gray-600">Deleting old audio files and regenerating TTS...</p><p class="mt-2 text-sm text-gray-500">Please wait, this may take a few minutes.</p></div>';
             document.getElementById('chapterModal').classList.remove('hidden');
 
             try {
@@ -2087,13 +1032,34 @@
                     throw new Error(data.error || 'Failed to regenerate TTS');
                 }
 
+                // Show success message with detailed results
+                let resultsHtml = '';
+                if (data.results) {
+                    const { totalPages, successCount, failedCount, failedPages } = data.results;
+                    resultsHtml = `
+                        <div class="bg-white border border-gray-200 rounded-lg p-4 text-sm space-y-2">
+                            <p><strong>Total Pages:</strong> ${totalPages}</p>
+                            <p class="text-green-600"><strong>Successfully Generated:</strong> ${successCount}</p>
+                            ${failedCount > 0 ? `
+                                <p class="text-red-600"><strong>Failed:</strong> ${failedCount}</p>
+                                <div class="mt-2">
+                                    <p class="font-semibold">Failed Pages:</p>
+                                    <ul class="list-disc list-inside ml-2">
+                                        ${failedPages.map(fp => `<li>Page ${fp.page}: ${fp.error || 'Unknown error'}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
                 document.getElementById('modalContent').innerHTML = `
                     <div class="space-y-4">
                         <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                             <h4 class="font-semibold text-green-800 mb-2 flex items-center gap-2">
-                                <i class="fas fa-check-circle"></i>TTS Regeneration Started
+                                <i class="fas fa-check-circle"></i>TTS Regeneration Completed
                             </h4>
-                            <p class="text-sm text-gray-700">Old audio files have been deleted. TTS generation is in progress. This may take a few minutes.</p>
+                            <p class="text-sm text-gray-700">All audio files have been regenerated successfully.</p>
                         </div>
                         <div class="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-700 space-y-2">
                             <p><strong>Chapter ID:</strong> ${data.chapterId}</p>
@@ -2105,11 +1071,13 @@
                                 <p class="text-orange-600"><strong>Warnings:</strong> ${data.errors.join(', ')}</p>
                             ` : ''}
                         </div>
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                            <p class="text-xs text-blue-700">You can close this dialog. The regeneration will continue in the background.</p>
-                        </div>
+                        ${resultsHtml}
                     </div>
                 `;
+                // Reload chapters to update button states
+                if (currentCourseId) {
+                    loadChapters(currentCourseId);
+                }
             } catch (error) {
                 document.getElementById('modalContent').innerHTML = `
                     <div class="text-center py-8">
@@ -2159,6 +1127,10 @@
                         </div>
                     </div>
                 `;
+                // Reload chapters to update button states
+                if (currentCourseId) {
+                    loadChapters(currentCourseId);
+                }
             } catch (error) {
                 document.getElementById('modalContent').innerHTML = `
                     <div class="text-center py-8">
@@ -2180,25 +1152,7 @@
             }
         });
 
-        // Close modals on outside click
-        document.getElementById('createCourseModal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('createCourseModal')) {
-                document.getElementById('createCourseModal').classList.add('hidden');
-                currentEditingCourseId = null;
-            }
-        });
-
-        document.getElementById('addChapterModal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('addChapterModal')) {
-                document.getElementById('addChapterModal').classList.add('hidden');
-            }
-        });
-
-        document.getElementById('updateChapterModal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('updateChapterModal')) {
-                document.getElementById('updateChapterModal').classList.add('hidden');
-            }
-        });
+        // Modals for course/chapter/quiz management have been moved to separate pages
 
 
         // Search functionality - Initialize when DOM is ready
@@ -2234,351 +1188,7 @@
         });
 
         // ========== Final Project Management ==========
-        
-        // Load final project for current course
-        async function loadFinalProject(courseId) {
-            try {
-                const response = await fetch(`${API_BASE}/api/courses/${courseId}/final-project`, {
-                    credentials: 'include'
-                });
-                
-                if (response.ok) {
-                    currentFinalProject = await response.json();
-                    updateFinalProjectUI();
-                } else if (response.status === 404) {
-                    currentFinalProject = null;
-                    updateFinalProjectUI();
-                } else {
-                    throw new Error('Failed to load final project');
-                }
-            } catch (error) {
-                console.error('Error loading final project:', error);
-                currentFinalProject = null;
-                updateFinalProjectUI();
-            }
-        }
-
-        // Update UI based on final project state
-        function updateFinalProjectUI() {
-            const btnText = document.getElementById('btnManageFinalProjectText');
-            if (currentFinalProject) {
-                if (btnText) btnText.textContent = 'Manage Final Project';
-                showFinalProjectExistsState();
-                loadDocuments();
-            } else {
-                if (btnText) btnText.textContent = 'Create Final Project';
-                showNoFinalProjectState();
-            }
-        }
-
-        function showNoFinalProjectState() {
-            document.getElementById('noFinalProjectState').classList.remove('hidden');
-            document.getElementById('finalProjectExistsState').classList.add('hidden');
-            document.getElementById('documentsSection').classList.add('hidden');
-        }
-
-        function showFinalProjectExistsState() {
-            document.getElementById('noFinalProjectState').classList.add('hidden');
-            document.getElementById('finalProjectExistsState').classList.remove('hidden');
-            document.getElementById('documentsSection').classList.remove('hidden');
-            
-            document.getElementById('displayProjectName').textContent = currentFinalProject.projectName || 'Untitled Project';
-            document.getElementById('displayProjectDescription').textContent = currentFinalProject.projectDescription || 'No description';
-        }
-
-        // Open final project modal
-        document.getElementById('btnManageFinalProject').addEventListener('click', () => {
-            if (!currentCourseId) {
-                alert('Please select a course first');
-                return;
-            }
-            loadFinalProject(currentCourseId);
-            document.getElementById('finalProjectModal').classList.remove('hidden');
-        });
-
-        // Close final project modal
-        document.getElementById('closeFinalProjectModal').addEventListener('click', () => {
-            document.getElementById('finalProjectModal').classList.add('hidden');
-            document.getElementById('addDocumentForm').classList.add('hidden');
-            document.getElementById('editFinalProjectForm').classList.add('hidden');
-            clearFinalProjectForm();
-        });
-
-        // Create final project
-        document.getElementById('btnCreateFinalProject').addEventListener('click', async () => {
-            const projectName = document.getElementById('inpProjectName').value.trim();
-            const projectDescription = document.getElementById('inpProjectDescription').value.trim();
-
-            if (!projectName) {
-                showFinalProjectError('Project name is required');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ projectName, projectDescription })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    currentFinalProject = data;
-                    updateFinalProjectUI();
-                    showFinalProjectSuccess('Final project created successfully!');
-                    clearFinalProjectForm();
-                } else {
-                    showFinalProjectError(data.error || 'Failed to create final project');
-                }
-            } catch (error) {
-                showFinalProjectError('Error creating final project: ' + error.message);
-            }
-        });
-
-        // Edit final project button
-        document.getElementById('btnEditFinalProject').addEventListener('click', () => {
-            document.getElementById('editFinalProjectForm').classList.remove('hidden');
-            document.getElementById('inpEditProjectName').value = currentFinalProject.projectName || '';
-            document.getElementById('inpEditProjectDescription').value = currentFinalProject.projectDescription || '';
-        });
-
-        // Cancel edit
-        document.getElementById('btnCancelEditFinalProject').addEventListener('click', () => {
-            document.getElementById('editFinalProjectForm').classList.add('hidden');
-        });
-
-        // Update final project
-        document.getElementById('btnUpdateFinalProject').addEventListener('click', async () => {
-            const projectName = document.getElementById('inpEditProjectName').value.trim();
-            const projectDescription = document.getElementById('inpEditProjectDescription').value.trim();
-
-            if (!projectName) {
-                showFinalProjectError('Project name is required');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project`, {
-                    method: 'PUT',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ projectName, projectDescription })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    currentFinalProject = { ...currentFinalProject, ...data };
-                    updateFinalProjectUI();
-                    document.getElementById('editFinalProjectForm').classList.add('hidden');
-                    showFinalProjectSuccess('Final project updated successfully!');
-                } else {
-                    showFinalProjectError(data.error || 'Failed to update final project');
-                }
-            } catch (error) {
-                showFinalProjectError('Error updating final project: ' + error.message);
-            }
-        });
-
-        // Add document button
-        document.getElementById('btnAddDocument').addEventListener('click', () => {
-            document.getElementById('addDocumentForm').classList.remove('hidden');
-            currentEditingDocumentId = null;
-            clearDocumentForm();
-        });
-
-        // Cancel add document
-        document.getElementById('btnCancelAddDocument').addEventListener('click', () => {
-            document.getElementById('addDocumentForm').classList.add('hidden');
-            clearDocumentForm();
-        });
-
-        // Save document
-        document.getElementById('btnSaveDocument').addEventListener('click', async () => {
-            const documentName = document.getElementById('inpDocumentName').value.trim();
-            const documentDescription = document.getElementById('inpDocumentDescription').value.trim();
-            const pdfFile = document.getElementById('inpDocumentPdf').files[0];
-
-            if (!documentName) {
-                showFinalProjectError('Document name is required');
-                return;
-            }
-
-            if (!pdfFile) {
-                showFinalProjectError('PDF file is required');
-                return;
-            }
-
-            if (pdfFile.type !== 'application/pdf') {
-                showFinalProjectError('File must be a PDF');
-                return;
-            }
-
-            try {
-                const formData = new FormData();
-                formData.append('documentName', documentName);
-                formData.append('documentDescription', documentDescription);
-                formData.append('pdfResource', pdfFile);
-
-                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project/documents`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showFinalProjectSuccess('Document added successfully!');
-                    document.getElementById('addDocumentForm').classList.add('hidden');
-                    clearDocumentForm();
-                    loadDocuments();
-                } else {
-                    showFinalProjectError(data.error || 'Failed to add document');
-                }
-            } catch (error) {
-                showFinalProjectError('Error adding document: ' + error.message);
-            }
-        });
-
-        // Load documents
-        async function loadDocuments() {
-            if (!currentFinalProject || !currentFinalProject.documents) {
-                document.getElementById('documentsList').innerHTML = '';
-                document.getElementById('documentsEmptyState').classList.remove('hidden');
-                return;
-            }
-
-            const documents = currentFinalProject.documents;
-            const documentsList = document.getElementById('documentsList');
-            const emptyState = document.getElementById('documentsEmptyState');
-
-            if (documents.length === 0) {
-                documentsList.innerHTML = '';
-                emptyState.classList.remove('hidden');
-                return;
-            }
-
-            emptyState.classList.add('hidden');
-            documentsList.innerHTML = documents.map(doc => `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
-                    <div class="flex-1">
-                        <h5 class="font-semibold text-gray-800">${escapeHtml(doc.documentName)}</h5>
-                        ${doc.documentDescription ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(doc.documentDescription)}</p>` : ''}
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <a href="${API_BASE}/api/courses/${currentCourseId}/final-project/documents/${doc.id}/pdf" 
-                           target="_blank"
-                           class="text-indigo-600 hover:text-indigo-800 px-3 py-1 rounded transition-colors">
-                            <i class="fas fa-download"></i> View PDF
-                        </a>
-                        <button onclick="deleteDocument('${doc.id}')" 
-                                class="text-red-600 hover:text-red-800 px-3 py-1 rounded transition-colors">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Delete document
-        window.deleteDocument = async function(documentId) {
-            if (!confirm('Are you sure you want to delete this document?')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/api/courses/${currentCourseId}/final-project/documents/${documentId}`, {
-                    method: 'DELETE',
-                    credentials: 'include'
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showFinalProjectSuccess('Document deleted successfully!');
-                    // Reload final project to get updated documents list
-                    await loadFinalProject(currentCourseId);
-                } else {
-                    showFinalProjectError(data.error || 'Failed to delete document');
-                }
-            } catch (error) {
-                showFinalProjectError('Error deleting document: ' + error.message);
-            }
-        };
-
-        // Helper functions
-        function clearFinalProjectForm() {
-            document.getElementById('inpProjectName').value = '';
-            document.getElementById('inpProjectDescription').value = '';
-        }
-
-        function clearDocumentForm() {
-            document.getElementById('inpDocumentName').value = '';
-            document.getElementById('inpDocumentDescription').value = '';
-            document.getElementById('inpDocumentPdf').value = '';
-            hideDocumentPdfPreview();
-        }
-
-        // Document PDF preview functions
-        function showDocumentPdfPreview(file) {
-            const preview = document.getElementById('documentPdfPreview');
-            const fileName = document.getElementById('documentPdfFileName');
-            const fileSize = document.getElementById('documentPdfFileSize');
-            
-            if (file) {
-                fileName.textContent = file.name;
-                const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-                fileSize.textContent = `${sizeInMB} MB`;
-                preview.classList.remove('hidden');
-            } else {
-                hideDocumentPdfPreview();
-            }
-        }
-
-        function hideDocumentPdfPreview() {
-            const preview = document.getElementById('documentPdfPreview');
-            preview.classList.add('hidden');
-            const fileInput = document.getElementById('inpDocumentPdf');
-            if (fileInput) {
-                fileInput.value = '';
-            }
-        }
-
-        // Listen for file input change
-        const documentPdfInput = document.getElementById('inpDocumentPdf');
-        if (documentPdfInput) {
-            documentPdfInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                showDocumentPdfPreview(file);
-            });
-        }
-
-        // Remove PDF button
-        const btnRemoveDocumentPdf = document.getElementById('btnRemoveDocumentPdf');
-        if (btnRemoveDocumentPdf) {
-            btnRemoveDocumentPdf.addEventListener('click', () => {
-                hideDocumentPdfPreview();
-            });
-        }
-
-        function showFinalProjectSuccess(message) {
-            const resultDiv = document.getElementById('finalProjectResult');
-            resultDiv.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
-            resultDiv.innerHTML = `<p class="text-green-800">${escapeHtml(message)}</p>`;
-            resultDiv.classList.remove('hidden');
-            setTimeout(() => resultDiv.classList.add('hidden'), 3000);
-        }
-
-        function showFinalProjectError(message) {
-            const resultDiv = document.getElementById('finalProjectResult');
-            resultDiv.className = 'bg-red-50 border border-red-200 rounded-lg p-4';
-            resultDiv.innerHTML = `<p class="text-red-800">${escapeHtml(message)}</p>`;
-            resultDiv.classList.remove('hidden');
-            setTimeout(() => resultDiv.classList.add('hidden'), 5000);
-        }
+        // Final project management has been moved to a separate page: final-project-management.html
 
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -2592,6 +1202,9 @@
                 loadCourses();
             }
         });
+        // ==================== QUIZ MANAGEMENT ====================
+        // Quiz management has been moved to a separate page: quiz-management.html
+
     </script>
 </body>
 

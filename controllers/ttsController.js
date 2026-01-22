@@ -2,7 +2,6 @@ const fileUtils = require('../utils/fileUtils');
 const audioUtils = require('../utils/audioUtils');
 const dbUtils = require('../utils/dbUtils');
 const geminiService = require('../services/geminiService');
-const edgeTTSService = require('../services/edgeTTSService');
 const textUtils = require('../utils/textUtils');
 const pdfTextExtractor = require('../utils/pdfTextExtractor');
 const config = require('../config/config');
@@ -71,11 +70,12 @@ async function generateTTS(req, res) {
         // This matches exactly with page timings calculation
 
         // 2. CACHE CHECK
-        // Check for cached audio (async)
-        if (await fileUtils.audioFileExists(docId)) {
-            console.log(`[TTS] Serving cached audio for doc ID: ${docId}`);
+        // Check for cached audio (async) - use new structure if courseId provided
+        const audioType = courseId ? 'chapters' : null;
+        if (await fileUtils.audioFileExists(docId, courseId, audioType)) {
+            console.log(`[TTS] Serving cached audio for doc ID: ${docId}${courseId ? ` (course: ${courseId})` : ''}`);
             try {
-                const fileBuffer = await fileUtils.readAudioFile(docId);
+                const fileBuffer = await fileUtils.readAudioFile(docId, courseId, audioType);
                 return res.json({
                     audioData: fileBuffer.toString('base64'),
                     mimeType: 'audio/wav'
@@ -87,44 +87,22 @@ async function generateTTS(req, res) {
         }
 
         // 3. GENERATION (SMART FALLBACK)
-        console.log(`[TTS] Cache miss. Generating new voice for ID: ${docId}`);
+        console.log(`[TTS] Cache miss. Generating new voice for ID: ${docId} using Gemini TTS`);
 
-        let pcmBuffer;
-        let mimeType;
+        // Use only Gemini TTS
+        const result = await geminiService.generateTTS(text, config.TTS_VOICE_DOCUMENT);
+        const pcmBuffer = result.pcmBuffer;
+        
+        // Convert PCM to WAV and save (using new structure if courseId provided)
+        const wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+        await fileUtils.saveAudioFile(docId, wavBuffer, courseId, audioType);
 
-        // Try Microsoft Edge TTS first (Free, High Quality)
-        try {
-            console.log(`[TTS] Attempting Edge TTS...`);
-            // Generate audio with cleaned text (already has "next slide" and "Titan Academy" removed)
-            const edgeAudio = await edgeTTSService.generateTTSWithEdge(text);
+        console.log(`[TTS] Generated via Gemini TTS. Saved cache${courseId ? ` (course: ${courseId})` : ''}.`);
 
-            // Save directly (it's likely MP3)
-            await fileUtils.saveAudioFile(docId, edgeAudio);
-
-            console.log(`[TTS] Generated via Edge TTS. Saved cache.`);
-
-            return res.json({
-                audioData: edgeAudio.toString('base64'),
-                mimeType: 'audio/mpeg' // Edge TTS usually is MP3
-            });
-
-        } catch (edgeError) {
-            console.warn(`[TTS] Edge TTS failed (${edgeError.message}). Falling back to Gemini...`);
-
-            // Fallback to Gemini
-            const result = await geminiService.generateTTS(text, config.TTS_VOICE_DOCUMENT);
-            pcmBuffer = result.pcmBuffer;
-            // Convert PCM to WAV and save
-            const wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-            await fileUtils.saveAudioFile(docId, wavBuffer);
-
-            console.log(`[TTS] Generated via Gemini. Saved cache.`);
-
-            return res.json({
-                audioData: wavBuffer.toString('base64'),
-                mimeType: 'audio/wav'
-            });
-        }
+        return res.json({
+            audioData: wavBuffer.toString('base64'),
+            mimeType: 'audio/wav'
+        });
 
     } catch (error) {
         console.error("[TTS Error]:", error);

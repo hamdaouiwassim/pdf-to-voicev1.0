@@ -3,12 +3,9 @@ const crypto = require('crypto');
 const config = require('../config/config');
 const constants = require('../utils/constants');
 const geminiService = require('../services/geminiService');
-const localTTSService = require('../services/localTTSService');
 const audioUtils = require('../utils/audioUtils');
 const fileUtils = require('../utils/fileUtils');
 const lipSyncService = require('../services/lipSyncService');
-
-const edgeTTSService = require('../services/edgeTTSService');
 
 const PY_STDIO_LIMIT = config.PYTHON_MAX_STDIO_LENGTH;
 
@@ -153,39 +150,15 @@ async function synthesizeFeedbackAudio(text) {
         return null;
     }
 
-    // Priority: Gemini TTS (High Quality) -> Edge TTS (Good Quality, Free) -> Local TTS (Offline)
-
-    // 1. Try Gemini TTS
+    // Use only Gemini TTS
     try {
         const { pcmBuffer } = await geminiService.generateTTS(text, config.TTS_VOICE_QA);
         const audioBuffer = audioUtils.pcmToWav(pcmBuffer);
         return { audioBuffer, mimeType: 'audio/wav' };
     } catch (geminiError) {
-        console.warn('[Lab] Gemini TTS unavailable:', geminiError.message);
-
-        // 2. Fallback to Edge TTS
-        try {
-            // Labs are typically in French per system prompt, but config.LAB_FEEDBACK_LANGUAGE might vary.
-            // Assuming French or auto-detect from config if available.
-            // The system prompt says "répondre en ${config.LAB_FEEDBACK_LANGUAGE}" which defaults to French usually.
-            const edgeAudio = await edgeTTSService.generateTTSWithEdge(text, 'fr-FR');
-            return { audioBuffer: edgeAudio, mimeType: 'audio/mpeg' };
-        } catch (edgeError) {
-            console.warn('[Lab] Edge TTS unavailable:', edgeError.message);
-
-            // 3. Fallback to Local TTS
-            try {
-                if (process.platform === 'win32') {
-                    const audioBuffer = await localTTSService.generateTTSLocal(text, config.LAB_TTS_LANGUAGE);
-                    return { audioBuffer, mimeType: 'audio/wav' };
-                }
-            } catch (localError) {
-                console.warn('[Lab] Local TTS unavailable:', localError.message);
-            }
-        }
+        console.error('[Lab] Gemini TTS failed:', geminiError.message);
+        return null;
     }
-
-    return null;
 }
 
 async function attachLipSync(audioId) {

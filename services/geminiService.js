@@ -91,9 +91,33 @@ async function generateTTS(text, voiceName = config.TTS_VOICE_DOCUMENT) {
     // Limit text length for TTS
     const contentForTTS = text.substring(0, config.TTS_TEXT_LIMIT);
 
+    // Clean the text to remove any potential instructions, prompts, or markdown
+    // Remove common instruction patterns that might confuse the TTS model
+    let cleanText = contentForTTS.trim();
+    
+    // Remove markdown formatting
+    cleanText = cleanText.replace(/\*\*/g, ''); // Remove bold
+    cleanText = cleanText.replace(/\*/g, ''); // Remove italic
+    cleanText = cleanText.replace(/#{1,6}\s/g, ''); // Remove headers
+    cleanText = cleanText.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1'); // Remove links, keep text
+    cleanText = cleanText.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
+    cleanText = cleanText.replace(/`([^`]+)`/g, '$1'); // Remove inline code
+    
+    // Remove instruction-like phrases that might trigger text generation
+    cleanText = cleanText.replace(/^(explain|describe|tell|say|generate|create|write|provide|give|show|list|outline|summarize|analyze|discuss|define|compare|contrast|evaluate|identify|explain why|explain how|what is|what are|how does|why does|when does|where does)/i, '');
+    cleanText = cleanText.replace(/^(you should|you must|you need|you can|you will|you are|please|note:|important:|warning:|tip:|remember:|note that)/i, '');
+    
+    // Final trim
+    cleanText = cleanText.trim();
+
+    // Ensure we have text to convert
+    if (!cleanText || cleanText.length === 0) {
+        throw new Error("No valid text to convert to speech after cleaning");
+    }
+
     const response = await ai.models.generateContent({
         model: config.GEMINI_TTS_MODEL,
-        contents: [{ parts: [{ text: contentForTTS }] }],
+        contents: [{ parts: [{ text: cleanText }] }],
         config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
@@ -118,9 +142,67 @@ async function generateTTS(text, voiceName = config.TTS_VOICE_DOCUMENT) {
     };
 }
 
+/**
+ * Generates TTS audio for quiz feedback using stricter instructions.
+ * @param {string} text - Text to convert to speech
+ * @param {string} voiceName - Voice name (default: QA voice)
+ * @returns {Promise<{pcmBuffer: Buffer, mimeType: string}>}
+ */
+async function generateQuizFeedbackTTS(text, voiceName = config.TTS_VOICE_QA) {
+    // Limit text length for TTS
+    const contentForTTS = text.substring(0, config.TTS_TEXT_LIMIT);
+    let cleanText = contentForTTS.trim();
+
+    // Remove markdown formatting
+    cleanText = cleanText.replace(/\*\*/g, '');
+    cleanText = cleanText.replace(/\*/g, '');
+    cleanText = cleanText.replace(/#{1,6}\s/g, '');
+    cleanText = cleanText.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+    cleanText = cleanText.replace(/```[\s\S]*?```/g, '');
+    cleanText = cleanText.replace(/`([^`]+)`/g, '$1');
+
+    cleanText = cleanText.trim();
+
+    if (!cleanText || cleanText.length === 0) {
+        throw new Error("No valid quiz feedback text to convert to speech after cleaning");
+    }
+
+    const response = await ai.models.generateContent({
+        model: config.GEMINI_TTS_MODEL,
+        systemInstruction: {
+            parts: [{
+                text: 'You are a text-to-speech system. Read the provided text aloud exactly as given. Do not answer, explain, or generate any text. Output audio only.'
+            }]
+        },
+        contents: [{ parts: [{ text: cleanText }] }],
+        config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName } }
+            }
+        }
+    });
+
+    const audioPart = response.candidates?.[0]?.content?.parts?.[0];
+    const rawPcmBase64 = audioPart?.inlineData?.data;
+    const mimeType = audioPart?.inlineData?.mimeType;
+
+    if (!rawPcmBase64) {
+        throw new Error("Quiz TTS API returned no audio data.");
+    }
+
+    const pcmBuffer = Buffer.from(rawPcmBase64, 'base64');
+
+    return {
+        pcmBuffer,
+        mimeType: mimeType || 'audio/L16;rate=24000'
+    };
+}
+
 module.exports = {
     generateText,
     generateTTS,
+    generateQuizFeedbackTTS,
     generateSummary,
 };
 

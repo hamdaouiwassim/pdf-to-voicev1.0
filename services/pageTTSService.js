@@ -5,12 +5,13 @@
  */
 
 const geminiService = require('./geminiService');
-const edgeTTSService = require('./edgeTTSService');
-const localTTSService = require('./localTTSService');
 const audioUtils = require('../utils/audioUtils');
 const fileUtils = require('../utils/fileUtils');
 const textUtils = require('../utils/textUtils');
+const lipSyncService = require('./lipSyncService');
 const config = require('../config/config');
+const path = require('path');
+const fsPromises = require('fs').promises;
 
 /**
  * Generate TTS audio for a single page
@@ -18,21 +19,29 @@ const config = require('../config/config');
  * @param {string} chapterId - Chapter ID
  * @param {number} pageNumber - Page number (1-indexed)
  * @param {string} language - Language code (optional)
- * @returns {Promise<{duration: number, audioPath: string}>} Duration in seconds and audio path
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @returns {Promise<{duration: number, audioPath: string, lipSyncPath: string}>} Duration and paths
  */
-async function generatePageTTS(pageText, chapterId, pageNumber, language = 'fr-FR') {
+async function generatePageTTS(pageText, chapterId, pageNumber, language = 'fr-FR', courseId = null) {
     if (!pageText || pageText.trim().length === 0) {
         throw new Error(`Empty text for page ${pageNumber}`);
     }
 
     // Check if audio already exists
-    if (await fileUtils.pageAudioFileExists(chapterId, pageNumber)) {
+    if (await fileUtils.pageAudioFileExists(chapterId, pageNumber, courseId)) {
         console.log(`[Page TTS] Audio already exists for chapter ${chapterId}, page ${pageNumber}`);
-        const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNumber);
+        const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNumber, courseId);
         const duration = await fileUtils.getAudioDuration(audioBuffer);
+        const audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNumber, courseId);
+        const lipSyncPath = fileUtils.getPageLipSyncFilePath(chapterId, pageNumber, courseId);
+        if (!(await fileUtils.pageLipSyncFileExists(chapterId, pageNumber, courseId))) {
+            await fsPromises.mkdir(path.dirname(lipSyncPath), { recursive: true });
+            await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+        }
         return {
             duration,
-            audioPath: fileUtils.getPageAudioFilePath(chapterId, pageNumber)
+            audioPath,
+            lipSyncPath
         };
     }
 
@@ -43,66 +52,32 @@ async function generatePageTTS(pageText, chapterId, pageNumber, language = 'fr-F
         throw new Error(`No text content after cleaning for page ${pageNumber}`);
     }
 
-    console.log(`[Page TTS] Generating audio for chapter ${chapterId}, page ${pageNumber} (${cleanedText.length} chars)`);
+    console.log(`[Page TTS] Generating audio for chapter ${chapterId}, page ${pageNumber} (${cleanedText.length} chars) using Gemini TTS`);
 
-    let audioBuffer;
-    let duration;
+    // Use only Gemini TTS
+    const result = await geminiService.generateTTS(cleanedText, config.TTS_VOICE_DOCUMENT);
+    const pcmBuffer = result.pcmBuffer;
+    
+    // Convert PCM to WAV
+    const audioBuffer = audioUtils.pcmToWav(pcmBuffer);
+    
+    // Calculate actual duration from WAV
+    const duration = await fileUtils.getAudioDuration(audioBuffer);
+    
+    // Save audio file
+    await fileUtils.savePageAudioFile(chapterId, pageNumber, audioBuffer, courseId);
 
-    // Try Microsoft Edge TTS first (Free, High Quality)
-    try {
-        console.log(`[Page TTS] Attempting Edge TTS for page ${pageNumber}...`);
-        audioBuffer = await edgeTTSService.generateTTSWithEdge(cleanedText, language);
-        
-        // Edge TTS returns MP3, we need to convert to WAV for duration calculation
-        // For now, save as MP3 and estimate duration
-        // TODO: Convert MP3 to WAV for accurate duration
-        await fileUtils.savePageAudioFile(chapterId, pageNumber, audioBuffer);
-        
-        // Estimate duration (rough calculation)
-        // MP3 at 128kbps: ~16KB per second
-        duration = Math.round((audioBuffer.length / 16000) * 10) / 10;
-        
-        console.log(`[Page TTS] Generated via Edge TTS for page ${pageNumber}, estimated duration: ${duration}s`);
-    } catch (edgeError) {
-        console.warn(`[Page TTS] Edge TTS failed for page ${pageNumber} (${edgeError.message}), falling back to Gemini...`);
-
-        // Fallback to Gemini
-        try {
-            const result = await geminiService.generateTTS(cleanedText, config.TTS_VOICE_DOCUMENT);
-            const pcmBuffer = result.pcmBuffer;
-            
-            // Convert PCM to WAV
-            audioBuffer = audioUtils.pcmToWav(pcmBuffer);
-            
-            // Calculate actual duration from WAV
-            duration = await fileUtils.getAudioDuration(audioBuffer);
-            
-            // Save audio file
-            await fileUtils.savePageAudioFile(chapterId, pageNumber, audioBuffer);
-            
-            console.log(`[Page TTS] Generated via Gemini for page ${pageNumber}, duration: ${duration}s`);
-        } catch (geminiError) {
-            console.warn(`[Page TTS] Gemini TTS failed for page ${pageNumber} (${geminiError.message}), trying Local TTS...`);
-            
-            // Fallback to Local TTS (Windows only)
-            if (process.platform === 'win32') {
-                try {
-                    audioBuffer = await localTTSService.generateTTSLocal(cleanedText, language);
-                    duration = await fileUtils.getAudioDuration(audioBuffer);
-                    await fileUtils.savePageAudioFile(chapterId, pageNumber, audioBuffer);
-                    console.log(`[Page TTS] Generated via Local TTS for page ${pageNumber}, duration: ${duration}s`);
-                } catch (localError) {
-                    throw new Error(`All TTS services failed for page ${pageNumber}: ${localError.message}`);
-                }
-            } else {
-                throw new Error(`All TTS services failed for page ${pageNumber}. Last error: ${geminiError.message}`);
-            }
-        }
-    }
+    const audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNumber, courseId);
+    const lipSyncPath = fileUtils.getPageLipSyncFilePath(chapterId, pageNumber, courseId);
+    await fsPromises.mkdir(path.dirname(lipSyncPath), { recursive: true });
+    await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+    
+    console.log(`[Page TTS] Generated via Gemini TTS for page ${pageNumber}, duration: ${duration}s`);
 
     return {
         duration,
-        audioPath: fileUtils.getPageAudioFilePath(chapterId, pageNumber)
+        audioPath,
+        lipSyncPath
     };
 }
 
@@ -112,9 +87,10 @@ async function generatePageTTS(pageText, chapterId, pageNumber, language = 'fr-F
  * @param {string} chapterId - Chapter ID
  * @param {string} language - Language code (optional)
  * @param {number} maxConcurrent - Maximum concurrent TTS generations (default: 3)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {Promise<Array>} Array of {page: number, duration: number, audioPath: string}
  */
-async function generateAllPagesTTS(pageDataArray, chapterId, language = 'fr-FR', maxConcurrent = 3) {
+async function generateAllPagesTTS(pageDataArray, chapterId, language = 'fr-FR', maxConcurrent = 3, courseId = null) {
     console.log(`[Page TTS] Generating TTS for ${pageDataArray.length} pages in chapter ${chapterId}`);
     
     const results = [];
@@ -130,7 +106,8 @@ async function generateAllPagesTTS(pageDataArray, chapterId, language = 'fr-FR',
                     pageData.text,
                     chapterId,
                     pageData.page,
-                    language
+                    language,
+                    courseId
                 );
                 return {
                     page: pageData.page,

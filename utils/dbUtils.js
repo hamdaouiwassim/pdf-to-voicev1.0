@@ -1311,6 +1311,569 @@ async function deleteFinalProjectSubmission(submissionId) {
     }
 }
 
+/**
+ * Quiz Database Operations
+ */
+
+/**
+ * Create a quiz question
+ * @param {Object} questionData - Question data object
+ * @returns {Promise<Object>} Created question
+ */
+async function createQuizQuestion(questionData) {
+    const {
+        id,
+        chapterId,
+        questionText,
+        options,
+        questionType = 'single',
+        correctAnswerIndex,
+        correctAnswerIndices,
+        explanation,
+        orderIndex
+    } = questionData;
+
+    // Validate and prepare options
+    if (!Array.isArray(options)) {
+        console.error('[DB] Options is not an array:', typeof options, options);
+        throw new Error('Options must be an array');
+    }
+
+    if (options.length < 2) {
+        console.error('[DB] Not enough options:', options);
+        throw new Error('At least 2 options are required');
+    }
+
+    // Ensure all options are strings and not empty
+    const validOptions = options
+        .map(opt => {
+            if (typeof opt !== 'string') {
+                return String(opt);
+            }
+            return opt.trim();
+        })
+        .filter(opt => opt.length > 0);
+
+    if (validOptions.length < 2) {
+        console.error('[DB] Not enough valid options after filtering:', validOptions);
+        throw new Error('At least 2 non-empty options are required');
+    }
+
+    // Stringify options to JSON
+    const optionsJson = JSON.stringify(validOptions);
+    
+    // Verify JSON stringification worked
+    try {
+        const testParse = JSON.parse(optionsJson);
+        if (!Array.isArray(testParse) || testParse.length !== validOptions.length) {
+            throw new Error('JSON stringification verification failed');
+        }
+    } catch (e) {
+        console.error('[DB] JSON stringification failed:', e);
+        throw new Error('Failed to stringify options to JSON');
+    }
+    
+    // Validate question type and correct answers
+    const isMultiple = questionType === 'multiple';
+    
+    if (isMultiple) {
+        if (!Array.isArray(correctAnswerIndices) || correctAnswerIndices.length === 0) {
+            throw new Error('Multiple-choice questions require at least one correct answer index');
+        }
+        // Validate all indices are valid
+        const invalidIndices = correctAnswerIndices.filter(idx => 
+            isNaN(idx) || idx < 0 || idx >= validOptions.length
+        );
+        if (invalidIndices.length > 0) {
+            throw new Error(`Invalid correct answer indices: ${invalidIndices.join(', ')}`);
+        }
+    } else {
+        if (correctAnswerIndex === undefined || correctAnswerIndex === null || 
+            isNaN(correctAnswerIndex) || correctAnswerIndex < 0 || correctAnswerIndex >= validOptions.length) {
+            throw new Error(`Invalid correctAnswerIndex: must be between 0 and ${validOptions.length - 1}`);
+        }
+    }
+
+    console.log('[DB] Saving question with options:', {
+        id,
+        chapterId,
+        questionType: isMultiple ? 'multiple' : 'single',
+        optionsCount: validOptions.length,
+        optionsJson: optionsJson,
+        optionsJsonLength: optionsJson.length,
+        correctAnswerIndex: isMultiple ? null : correctAnswerIndex,
+        correctAnswerIndices: isMultiple ? correctAnswerIndices : null,
+        validOptions: validOptions
+    });
+
+    try {
+        const correctIndicesJson = isMultiple ? JSON.stringify(correctAnswerIndices) : null;
+        
+        await db.query(
+            `INSERT INTO quiz_questions (
+                id, chapter_id, question_text, options, question_type,
+                correct_answer_index, correct_answer_indices,
+                explanation, order_index
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                chapterId,
+                questionText,
+                optionsJson,
+                isMultiple ? 'multiple' : 'single',
+                isMultiple ? null : correctAnswerIndex,
+                correctIndicesJson,
+                explanation || null,
+                orderIndex || 0
+            ]
+        );
+
+        // Verify the question was saved correctly by querying directly
+        const verifyQuery = await db.query(
+            `SELECT options, question_text FROM quiz_questions WHERE id = ?`,
+            [id]
+        );
+
+        if (verifyQuery.length === 0) {
+            throw new Error('Question was not inserted into database');
+        }
+
+        const rawOptions = verifyQuery[0].options;
+        console.log('[DB] Raw options from database:', {
+            type: typeof rawOptions,
+            value: rawOptions,
+            isString: typeof rawOptions === 'string',
+            isArray: Array.isArray(rawOptions)
+        });
+
+        // Verify the question was saved correctly
+        const savedQuestion = await getQuizQuestionById(id);
+        if (!savedQuestion) {
+            throw new Error('Failed to retrieve saved question');
+        }
+
+        console.log('[DB] Question saved successfully:', {
+            id: savedQuestion.id,
+            optionsCount: savedQuestion.options ? savedQuestion.options.length : 0,
+            options: savedQuestion.options,
+            rawOptionsFromDB: rawOptions
+        });
+
+        // Double-check options are present
+        if (!savedQuestion.options || !Array.isArray(savedQuestion.options) || savedQuestion.options.length === 0) {
+            console.error('[DB] WARNING: Options are missing or empty after save!', {
+                savedQuestion,
+                rawOptions
+            });
+            throw new Error('Options were not saved correctly to the database');
+        }
+
+        return savedQuestion;
+    } catch (error) {
+        console.error('[DB] Error saving quiz question:', error);
+        console.error('[DB] Query params:', {
+            id,
+            chapterId,
+            questionText: questionText ? questionText.substring(0, 50) : null,
+            optionsJson: optionsJson.substring(0, 100),
+            correctAnswerIndex,
+            explanation: explanation ? explanation.substring(0, 50) : null,
+            orderIndex
+        });
+        throw error;
+    }
+}
+
+/**
+ * Get quiz question by ID
+ * @param {string} questionId - Question ID
+ * @returns {Promise<Object|null>} Question object or null
+ */
+async function getQuizQuestionById(questionId) {
+    const questions = await db.query(
+        `SELECT 
+            id,
+            chapter_id as chapterId,
+            question_text as questionText,
+            options,
+            question_type as questionType,
+            correct_answer_index as correctAnswerIndex,
+            correct_answer_indices as correctAnswerIndices,
+            explanation,
+            order_index as orderIndex,
+            created_at as createdAt,
+            updated_at as updatedAt
+         FROM quiz_questions 
+         WHERE id = ?`,
+        [questionId]
+    );
+
+    if (questions.length === 0) {
+        return null;
+    }
+
+    const question = questions[0];
+    
+    // Parse options JSON
+    // MySQL JSON columns might return as object or string depending on driver/version
+    if (question.options) {
+        if (typeof question.options === 'string') {
+            try {
+                question.options = JSON.parse(question.options);
+            } catch (e) {
+                console.error('[DB] Error parsing options JSON:', e, 'Raw value:', question.options);
+                question.options = [];
+            }
+        } else if (Array.isArray(question.options)) {
+            // Already parsed by MySQL driver
+            question.options = question.options;
+        } else {
+            console.warn('[DB] Options is not string or array:', typeof question.options, question.options);
+            question.options = [];
+        }
+    } else {
+        question.options = [];
+    }
+
+    // Parse correct_answer_indices JSON for multiple-choice questions
+    if (question.questionType === 'multiple' && question.correctAnswerIndices) {
+        if (typeof question.correctAnswerIndices === 'string') {
+            try {
+                question.correctAnswerIndices = JSON.parse(question.correctAnswerIndices);
+            } catch (e) {
+                console.error('[DB] Error parsing correctAnswerIndices JSON:', e);
+                question.correctAnswerIndices = [];
+            }
+        } else if (Array.isArray(question.correctAnswerIndices)) {
+            // Already parsed
+            question.correctAnswerIndices = question.correctAnswerIndices;
+        }
+    } else if (question.questionType === 'multiple') {
+        question.correctAnswerIndices = [];
+    }
+
+    // Set default question type if not set (for backward compatibility)
+    if (!question.questionType) {
+        question.questionType = 'single';
+    }
+
+    console.log('[DB] Retrieved question:', {
+        id: question.id,
+        questionType: question.questionType,
+        optionsCount: Array.isArray(question.options) ? question.options.length : 0,
+        correctAnswerIndex: question.correctAnswerIndex,
+        correctAnswerIndices: question.correctAnswerIndices
+    });
+
+    return question;
+}
+
+/**
+ * Get all quiz questions for a chapter
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<Array>} Array of questions
+ */
+async function getQuizQuestionsByChapterId(chapterId) {
+    const questions = await db.query(
+        `SELECT 
+            id,
+            chapter_id as chapterId,
+            question_text as questionText,
+            options,
+            question_type as questionType,
+            correct_answer_index as correctAnswerIndex,
+            correct_answer_indices as correctAnswerIndices,
+            explanation,
+            order_index as orderIndex,
+            created_at as createdAt,
+            updated_at as updatedAt
+         FROM quiz_questions 
+         WHERE chapter_id = ?
+         ORDER BY order_index ASC, created_at ASC`,
+        [chapterId]
+    );
+
+    // Parse options JSON for each question
+    return questions.map(question => {
+        // MySQL JSON columns might return as object or string depending on driver/version
+        if (question.options) {
+            if (typeof question.options === 'string') {
+                try {
+                    question.options = JSON.parse(question.options);
+                } catch (e) {
+                    console.error('[DB] Error parsing options JSON for question', question.id, ':', e, 'Raw value:', question.options);
+                    question.options = [];
+                }
+            } else if (Array.isArray(question.options)) {
+                // Already parsed by MySQL driver
+                question.options = question.options;
+            } else {
+                console.warn('[DB] Options is not string or array for question', question.id, ':', typeof question.options, question.options);
+                question.options = [];
+            }
+        } else {
+            question.options = [];
+        }
+
+        // Parse correct_answer_indices JSON for multiple-choice questions
+        if (question.questionType === 'multiple' && question.correctAnswerIndices) {
+            if (typeof question.correctAnswerIndices === 'string') {
+                try {
+                    question.correctAnswerIndices = JSON.parse(question.correctAnswerIndices);
+                } catch (e) {
+                    console.error('[DB] Error parsing correctAnswerIndices JSON for question', question.id, ':', e);
+                    question.correctAnswerIndices = [];
+                }
+            } else if (Array.isArray(question.correctAnswerIndices)) {
+                // Already parsed
+                question.correctAnswerIndices = question.correctAnswerIndices;
+            }
+        } else if (question.questionType === 'multiple') {
+            question.correctAnswerIndices = [];
+        }
+
+        // Set default question type if not set (for backward compatibility)
+        if (!question.questionType) {
+            question.questionType = 'single';
+        }
+
+        return question;
+    });
+}
+
+/**
+ * Update quiz question
+ * @param {string} questionId - Question ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated question
+ */
+async function updateQuizQuestion(questionId, updates) {
+    const fields = [];
+    const values = [];
+
+    if (updates.questionText !== undefined) {
+        fields.push('question_text = ?');
+        values.push(updates.questionText);
+    }
+    if (updates.options !== undefined) {
+        fields.push('options = ?');
+        values.push(JSON.stringify(updates.options));
+    }
+    if (updates.questionType !== undefined) {
+        fields.push('question_type = ?');
+        values.push(updates.questionType);
+    }
+    if (updates.correctAnswerIndex !== undefined) {
+        fields.push('correct_answer_index = ?');
+        values.push(updates.correctAnswerIndex);
+        // If switching to single, clear multiple indices
+        if (updates.questionType === 'single' || (!updates.questionType && updates.correctAnswerIndex !== null)) {
+            fields.push('correct_answer_indices = NULL');
+        }
+    }
+    if (updates.correctAnswerIndices !== undefined) {
+        if (updates.correctAnswerIndices === null) {
+            fields.push('correct_answer_indices = NULL');
+        } else {
+            fields.push('correct_answer_indices = ?');
+            values.push(JSON.stringify(updates.correctAnswerIndices));
+        }
+        // If switching to multiple, clear single index
+        if (updates.questionType === 'multiple') {
+            fields.push('correct_answer_index = NULL');
+        }
+    }
+    if (updates.explanation !== undefined) {
+        fields.push('explanation = ?');
+        values.push(updates.explanation);
+    }
+    if (updates.orderIndex !== undefined) {
+        fields.push('order_index = ?');
+        values.push(updates.orderIndex);
+    }
+
+    if (fields.length === 0) {
+        return await getQuizQuestionById(questionId);
+    }
+
+    values.push(questionId);
+    await db.query(
+        `UPDATE quiz_questions SET ${fields.join(', ')} WHERE id = ?`,
+        values
+    );
+
+    return await getQuizQuestionById(questionId);
+}
+
+/**
+ * Delete quiz question
+ * @param {string} questionId - Question ID
+ * @returns {Promise<boolean>} Success status
+ */
+async function deleteQuizQuestion(questionId) {
+    const result = await db.query(
+        `DELETE FROM quiz_questions WHERE id = ?`,
+        [questionId]
+    );
+    return result.affectedRows > 0;
+}
+
+/**
+ * Create a quiz attempt
+ * @param {Object} attemptData - Attempt data object
+ * @returns {Promise<Object>} Created attempt
+ */
+async function createQuizAttempt(attemptData) {
+    const {
+        id,
+        userId,
+        chapterId,
+        score,
+        totalQuestions,
+        percentage,
+        answers
+    } = attemptData;
+
+    await db.query(
+        `INSERT INTO quiz_attempts (
+            id, user_id, chapter_id, score, total_questions,
+            percentage, answers
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+            id,
+            userId,
+            chapterId,
+            score,
+            totalQuestions,
+            percentage,
+            JSON.stringify(answers)
+        ]
+    );
+
+    return await getQuizAttemptById(id);
+}
+
+/**
+ * Get quiz attempt by ID
+ * @param {string} attemptId - Attempt ID
+ * @returns {Promise<Object|null>} Attempt object or null
+ */
+async function getQuizAttemptById(attemptId) {
+    const attempts = await db.query(
+        `SELECT 
+            id,
+            user_id as userId,
+            chapter_id as chapterId,
+            score,
+            total_questions as totalQuestions,
+            percentage,
+            answers,
+            completed_at as completedAt
+         FROM quiz_attempts 
+         WHERE id = ?`,
+        [attemptId]
+    );
+
+    if (attempts.length === 0) {
+        return null;
+    }
+
+    const attempt = attempts[0];
+    // Parse answers JSON
+    if (attempt.answers) {
+        try {
+            attempt.answers = JSON.parse(attempt.answers);
+        } catch (e) {
+            attempt.answers = [];
+        }
+    } else {
+        attempt.answers = [];
+    }
+
+    return attempt;
+}
+
+/**
+ * Get quiz attempts by user and chapter
+ * @param {number} userId - User ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<Array>} Array of attempts
+ */
+async function getQuizAttemptsByUserAndChapter(userId, chapterId) {
+    const attempts = await db.query(
+        `SELECT 
+            id,
+            user_id as userId,
+            chapter_id as chapterId,
+            score,
+            total_questions as totalQuestions,
+            percentage,
+            answers,
+            completed_at as completedAt
+         FROM quiz_attempts 
+         WHERE user_id = ? AND chapter_id = ?
+         ORDER BY completed_at DESC`,
+        [userId, chapterId]
+    );
+
+    // Parse answers JSON for each attempt
+    return attempts.map(attempt => {
+        if (attempt.answers) {
+            try {
+                attempt.answers = JSON.parse(attempt.answers);
+            } catch (e) {
+                attempt.answers = [];
+            }
+        } else {
+            attempt.answers = [];
+        }
+        return attempt;
+    });
+}
+
+/**
+ * Get best quiz attempt for user and chapter
+ * @param {number} userId - User ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<Object|null>} Best attempt or null
+ */
+async function getBestQuizAttempt(userId, chapterId) {
+    const attempts = await db.query(
+        `SELECT 
+            id,
+            user_id as userId,
+            chapter_id as chapterId,
+            score,
+            total_questions as totalQuestions,
+            percentage,
+            answers,
+            completed_at as completedAt
+         FROM quiz_attempts 
+         WHERE user_id = ? AND chapter_id = ?
+         ORDER BY percentage DESC, completed_at DESC
+         LIMIT 1`,
+        [userId, chapterId]
+    );
+
+    if (attempts.length === 0) {
+        return null;
+    }
+
+    const attempt = attempts[0];
+    // Parse answers JSON
+    if (attempt.answers) {
+        try {
+            attempt.answers = JSON.parse(attempt.answers);
+        } catch (e) {
+            attempt.answers = [];
+        }
+    } else {
+        attempt.answers = [];
+    }
+
+    return attempt;
+}
+
 module.exports = {
     // Course operations
     createCourse,
@@ -1363,6 +1926,17 @@ module.exports = {
     getFinalProjectSubmissionById,
     getFinalProjectSubmissionByUser,
     updateFinalProjectSubmission,
-    deleteFinalProjectSubmission
+    deleteFinalProjectSubmission,
+
+    // Quiz operations
+    createQuizQuestion,
+    getQuizQuestionById,
+    getQuizQuestionsByChapterId,
+    updateQuizQuestion,
+    deleteQuizQuestion,
+    createQuizAttempt,
+    getQuizAttemptById,
+    getQuizAttemptsByUserAndChapter,
+    getBestQuizAttempt
 };
 

@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs').promises;
 const dbUtils = require('../utils/dbUtils');
-const config = require('../config/config');
+const fileUtils = require('../utils/fileUtils');
 
 /**
  * Create a new final project
@@ -143,7 +143,7 @@ async function deleteFinalProject(req, res) {
         const documents = await dbUtils.getFinalProjectDocuments(project.id);
         for (const doc of documents) {
             if (doc.pdfResource) {
-                const pdfPath = path.join(config.UPLOADS_DIR, 'final-projects', courseId, project.id, doc.pdfResource);
+                const pdfPath = path.join(fileUtils.getFinalProjectDir(courseId, project.id), doc.pdfResource);
                 try {
                     await fs.unlink(pdfPath);
                 } catch (err) {
@@ -201,8 +201,8 @@ async function addDocument(req, res) {
             return res.status(404).json({ error: 'Final project not found for this course' });
         }
 
-        // Create directory structure: uploads/final-projects/{courseId}/{projectId}/
-        const projectDir = path.join(config.UPLOADS_DIR, 'final-projects', courseId, project.id);
+        // Create directory structure: media/{courseId}/uploads/final-projects/{projectId}/
+        const projectDir = fileUtils.getFinalProjectDir(courseId, project.id);
         await fs.mkdir(projectDir, { recursive: true });
 
         // Save PDF file
@@ -262,7 +262,7 @@ async function getDocumentPdf(req, res) {
             return res.status(404).json({ error: 'PDF resource not found for this document' });
         }
 
-        const pdfPath = path.join(config.UPLOADS_DIR, 'final-projects', courseId, project.id, document.pdfResource);
+        const pdfPath = path.join(fileUtils.getFinalProjectDir(courseId, project.id), document.pdfResource);
 
         // Check if file exists
         try {
@@ -302,7 +302,7 @@ async function deleteDocument(req, res) {
 
         // Delete PDF file if exists
         if (document.pdfResource) {
-            const pdfPath = path.join(config.UPLOADS_DIR, 'final-projects', courseId, project.id, document.pdfResource);
+            const pdfPath = path.join(fileUtils.getFinalProjectDir(courseId, project.id), document.pdfResource);
             try {
                 await fs.unlink(pdfPath);
             } catch (err) {
@@ -394,8 +394,8 @@ async function submitWork(req, res) {
             return res.status(400).json({ error: 'File is required for new submission' });
         }
 
-        // Create directory structure: uploads/final-projects/{courseId}/{projectId}/submissions/
-        const submissionsDir = path.join(config.UPLOADS_DIR, 'final-projects', courseId, project.id, 'submissions');
+        // Create directory structure: media/{courseId}/uploads/final-projects/{projectId}/submissions/
+        const submissionsDir = path.join(fileUtils.getFinalProjectDir(courseId, project.id), 'submissions');
         await fs.mkdir(submissionsDir, { recursive: true });
 
         let fileResource = existingSubmission?.fileResource;
@@ -477,7 +477,7 @@ async function getSubmissionFile(req, res) {
             return res.status(404).json({ error: 'Submission file not found' });
         }
 
-        const filePath = path.join(config.UPLOADS_DIR, 'final-projects', courseId, project.id, 'submissions', submission.fileResource);
+        const filePath = path.join(fileUtils.getFinalProjectDir(courseId, project.id), 'submissions', submission.fileResource);
 
         // Check if file exists
         try {

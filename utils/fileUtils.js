@@ -6,16 +6,140 @@ const constants = require('./constants');
 
 /**
  * Ensures all necessary directories exist on server startup.
+ * Media layout: media/{courseId}/uploads|audios|json, media/_global/uploads|audios
  */
 function setupDirectories() {
+    if (!fs.existsSync(config.MEDIA_DIR)) {
+        fs.mkdirSync(config.MEDIA_DIR, { recursive: true });
+        console.log(`[FS] Created media directory: ${config.MEDIA_DIR}`);
+    }
     if (!fs.existsSync(config.UPLOADS_DIR)) {
         fs.mkdirSync(config.UPLOADS_DIR, { recursive: true });
-        console.log(`[FS] Created document upload directory: ${config.UPLOADS_DIR}`);
+        console.log(`[FS] Created global uploads directory: ${config.UPLOADS_DIR}`);
     }
     if (!fs.existsSync(config.AUDIOS_DIR)) {
         fs.mkdirSync(config.AUDIOS_DIR, { recursive: true });
-        console.log(`[FS] Created audio cache directory: ${config.AUDIOS_DIR}`);
+        console.log(`[FS] Created global audios directory: ${config.AUDIOS_DIR}`);
     }
+}
+
+/**
+ * Get media directory path for a course
+ * @param {string} courseId - Course ID
+ * @returns {string} Path to course media directory
+ */
+function getCourseMediaDir(courseId) {
+    return path.join(config.MEDIA_DIR, courseId);
+}
+
+/**
+ * Get uploads directory path for a course (base for courses subtree)
+ * media/{courseId}/uploads/courses
+ * @param {string} courseId - Course ID
+ * @returns {string} Path to course uploads directory
+ */
+function getCourseUploadsDir(courseId) {
+    return path.join(getCourseMediaDir(courseId), 'uploads', 'courses');
+}
+
+/**
+ * Get course-level uploads directory (course image, chapter subdirs)
+ * media/{courseId}/uploads/courses/{courseId}
+ * @param {string} courseId - Course ID
+ * @returns {string} Path to course-level uploads directory
+ */
+function getCourseUploadsCourseDir(courseId) {
+    return path.join(getCourseUploadsDir(courseId), courseId);
+}
+
+/**
+ * Get chapter uploads directory path
+ * @param {string} courseId - Course ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {string} Path to chapter uploads directory
+ */
+function getChapterUploadsDir(courseId, chapterId) {
+    return path.join(getCourseUploadsDir(courseId), courseId, chapterId);
+}
+
+/**
+ * Get final-projects directory for a course
+ * media/{courseId}/uploads/final-projects
+ * @param {string} courseId - Course ID
+ * @returns {string}
+ */
+function getCourseFinalProjectsDir(courseId) {
+    return path.join(getCourseMediaDir(courseId), 'uploads', 'final-projects');
+}
+
+/**
+ * Get final project directory
+ * media/{courseId}/uploads/final-projects/{projectId}
+ * @param {string} courseId - Course ID
+ * @param {string} projectId - Project ID
+ * @returns {string}
+ */
+function getFinalProjectDir(courseId, projectId) {
+    return path.join(getCourseFinalProjectsDir(courseId), projectId);
+}
+
+/**
+ * Get labs directory for a course
+ * media/{courseId}/uploads/labs
+ * @param {string} courseId - Course ID
+ * @returns {string}
+ */
+function getCourseLabsDir(courseId) {
+    return path.join(getCourseMediaDir(courseId), 'uploads', 'labs');
+}
+
+/**
+ * Get lab directory
+ * media/{courseId}/uploads/labs/{labId}
+ * @param {string} courseId - Course ID
+ * @param {string} labId - Lab ID
+ * @returns {string}
+ */
+function getLabDir(courseId, labId) {
+    return path.join(getCourseLabsDir(courseId), labId);
+}
+
+/**
+ * Get audios directory path for a course
+ * @param {string} courseId - Course ID
+ * @returns {string} Path to course audios directory
+ */
+function getCourseAudiosDir(courseId) {
+    return path.join(getCourseMediaDir(courseId), 'audios');
+}
+
+/**
+ * Get chapter audios directory path
+ * @param {string} courseId - Course ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {string} Path to chapter audios directory
+ */
+function getChapterAudiosDir(courseId, chapterId) {
+    return path.join(getCourseAudiosDir(courseId), 'chapters', chapterId);
+}
+
+/**
+ * Get JSON directory path for a course
+ * @param {string} courseId - Course ID
+ * @returns {string} Path to course JSON directory
+ */
+function getCourseJsonDir(courseId) {
+    return path.join(getCourseMediaDir(courseId), 'json');
+}
+
+/**
+ * Get chapter JSON directory path
+ * @param {string} courseId - Course ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {string} Path to chapter JSON directory
+ */
+function getChapterJsonDir(courseId, chapterId) {
+    return path.join(getCourseJsonDir(courseId), 'chapters', chapterId);
 }
 
 /**
@@ -151,10 +275,12 @@ async function getAllDocuments() {
 /**
  * Checks if an audio file exists (async).
  * @param {string} audioId - Audio file ID (without extension)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @param {string} audioType - Type of audio: 'chapters', 'quiz', 'qa', 'lab' (optional)
  * @returns {Promise<boolean>}
  */
-async function audioFileExists(audioId) {
-    const audioFilePath = path.join(config.AUDIOS_DIR, `${audioId}.wav`);
+async function audioFileExists(audioId, courseId = null, audioType = null) {
+    const audioFilePath = getAudioFilePath(audioId, courseId, audioType);
     try {
         await fsPromises.access(audioFilePath);
         return true;
@@ -180,10 +306,14 @@ async function fileExists(filePath) {
 /**
  * Reads an audio file.
  * @param {string} audioId - Audio file ID (without extension)
+ * @param {string} [courseId] - Course ID (optional, for course-based structure)
+ * @param {string} [audioType] - Type: 'chapters', 'quiz', 'qa', 'lab' (optional)
  * @returns {Promise<Buffer>}
  */
-async function readAudioFile(audioId) {
-    const audioFilePath = path.join(config.AUDIOS_DIR, `${audioId}.wav`);
+async function readAudioFile(audioId, courseId = null, audioType = null) {
+    const audioFilePath = (courseId && audioType)
+        ? getAudioFilePath(audioId, courseId, audioType)
+        : path.join(config.AUDIOS_DIR, `${audioId}.wav`);
     return await fsPromises.readFile(audioFilePath);
 }
 
@@ -191,28 +321,88 @@ async function readAudioFile(audioId) {
  * Saves an audio file.
  * @param {string} audioId - Audio file ID (without extension)
  * @param {Buffer} audioBuffer - Audio file buffer
+ * @param {string} [courseId] - Course ID (optional, for course-based structure)
+ * @param {string} [audioType] - Type: 'chapters', 'quiz', 'qa', 'lab' (optional)
  * @returns {Promise<void>}
  */
-async function saveAudioFile(audioId, audioBuffer) {
-    const audioFilePath = path.join(config.AUDIOS_DIR, `${audioId}.wav`);
+async function saveAudioFile(audioId, audioBuffer, courseId = null, audioType = null) {
+    const audioFilePath = (courseId && audioType)
+        ? getAudioFilePath(audioId, courseId, audioType)
+        : path.join(config.AUDIOS_DIR, `${audioId}.wav`);
+    await fsPromises.mkdir(path.dirname(audioFilePath), { recursive: true });
     await fsPromises.writeFile(audioFilePath, audioBuffer);
 }
 
 /**
  * Get absolute path to an audio file.
- * @param {string} audioId
+ * @param {string} audioId - Audio ID
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @param {string} audioType - Type of audio: 'chapters', 'quiz', 'qa', 'lab' (optional)
  * @returns {string}
  */
-function getAudioFilePath(audioId) {
+function getAudioFilePath(audioId, courseId = null, audioType = null) {
+    // If courseId is provided, use new structure
+    if (courseId && audioType) {
+        const audioSubDir = audioType;
+        return path.join(getCourseAudiosDir(courseId), audioSubDir, `${audioId}${constants.FILE_EXTENSIONS.WAV}`);
+    }
+    // Legacy path for backward compatibility
     return path.join(config.AUDIOS_DIR, `${audioId}${constants.FILE_EXTENSIONS.WAV}`);
+}
+
+/**
+ * Get absolute path to a chapter audio file (main or summary)
+ * @param {string} chapterId - Chapter ID
+ * @param {string} courseId - Course ID
+ * @param {string} type - 'main' or 'summary' (default: 'main')
+ * @returns {string}
+ */
+function getChapterAudioFilePath(chapterId, courseId, type = 'main') {
+    const audioDir = getChapterAudiosDir(courseId, chapterId);
+    const filename = type === 'summary' 
+        ? `${chapterId}-summary${constants.FILE_EXTENSIONS.WAV}`
+        : `${chapterId}${constants.FILE_EXTENSIONS.WAV}`;
+    return path.join(audioDir, filename);
+}
+
+/**
+ * Save chapter main or summary audio (media layout)
+ * @param {string} chapterId - Chapter ID
+ * @param {string} courseId - Course ID
+ * @param {string} type - 'main' or 'summary'
+ * @param {Buffer} audioBuffer - WAV buffer
+ * @returns {Promise<void>}
+ */
+async function saveChapterAudio(chapterId, courseId, type, audioBuffer) {
+    const audioPath = getChapterAudioFilePath(chapterId, courseId, type);
+    await fsPromises.mkdir(path.dirname(audioPath), { recursive: true });
+    await fsPromises.writeFile(audioPath, audioBuffer);
+}
+
+/**
+ * Read chapter main or summary audio
+ * @param {string} chapterId - Chapter ID
+ * @param {string} courseId - Course ID
+ * @param {string} type - 'main' or 'summary'
+ * @returns {Promise<Buffer>}
+ */
+async function readChapterAudio(chapterId, courseId, type) {
+    const audioPath = getChapterAudioFilePath(chapterId, courseId, type);
+    return await fsPromises.readFile(audioPath);
 }
 
 /**
  * Get directory path for page-based audio files (for chapters)
  * @param {string} chapterId - Chapter ID
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {string} Directory path
  */
-function getPageAudioDir(chapterId) {
+function getPageAudioDir(chapterId, courseId = null) {
+    // If courseId is provided, use new structure
+    if (courseId) {
+        return path.join(getChapterAudiosDir(courseId, chapterId), 'pages');
+    }
+    // Legacy path for backward compatibility
     return path.join(config.AUDIOS_DIR, chapterId);
 }
 
@@ -220,22 +410,75 @@ function getPageAudioDir(chapterId) {
  * Get absolute path to a page audio file
  * @param {string} chapterId - Chapter ID
  * @param {number} pageNumber - Page number (1-indexed)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {string} Full path to audio file
  */
-function getPageAudioFilePath(chapterId, pageNumber) {
-    const pageDir = getPageAudioDir(chapterId);
+function getPageAudioFilePath(chapterId, pageNumber, courseId = null) {
+    const pageDir = getPageAudioDir(chapterId, courseId);
     const pageNumStr = String(pageNumber).padStart(2, '0'); // 01, 02, 03, etc.
     return path.join(pageDir, `page_${pageNumStr}.wav`);
+}
+
+/**
+ * Get directory path for page-based lip sync JSON files (for chapters)
+ * @param {string} chapterId - Chapter ID
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @returns {string} Directory path
+ */
+function getPageLipSyncDir(chapterId, courseId = null) {
+    if (courseId) {
+        return path.join(getChapterJsonDir(courseId, chapterId), 'pages');
+    }
+    return path.join(config.AUDIOS_DIR, chapterId);
+}
+
+/**
+ * Get absolute path to a page lip sync JSON file
+ * @param {string} chapterId - Chapter ID
+ * @param {number} pageNumber - Page number (1-indexed)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @returns {string} Full path to lip sync JSON file
+ */
+function getPageLipSyncFilePath(chapterId, pageNumber, courseId = null) {
+    const pageDir = getPageLipSyncDir(chapterId, courseId);
+    const pageNumStr = String(pageNumber).padStart(2, '0'); // 01, 02, 03, etc.
+    return path.join(pageDir, `page_${pageNumStr}.json`);
+}
+
+/**
+ * Check if a page lip sync JSON file exists
+ * @param {string} chapterId - Chapter ID
+ * @param {number} pageNumber - Page number (1-indexed)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @returns {Promise<boolean>}
+ */
+async function pageLipSyncFileExists(chapterId, pageNumber, courseId = null) {
+    const lipSyncPath = getPageLipSyncFilePath(chapterId, pageNumber, courseId);
+    return await fileExists(lipSyncPath);
+}
+
+/**
+ * Read a page lip sync JSON file
+ * @param {string} chapterId - Chapter ID
+ * @param {number} pageNumber - Page number (1-indexed)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @returns {Promise<Object>}
+ */
+async function readPageLipSyncFile(chapterId, pageNumber, courseId = null) {
+    const lipSyncPath = getPageLipSyncFilePath(chapterId, pageNumber, courseId);
+    const content = await fsPromises.readFile(lipSyncPath, 'utf8');
+    return JSON.parse(content);
 }
 
 /**
  * Check if a page audio file exists
  * @param {string} chapterId - Chapter ID
  * @param {number} pageNumber - Page number (1-indexed)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {Promise<boolean>}
  */
-async function pageAudioFileExists(chapterId, pageNumber) {
-    const audioPath = getPageAudioFilePath(chapterId, pageNumber);
+async function pageAudioFileExists(chapterId, pageNumber, courseId = null) {
+    const audioPath = getPageAudioFilePath(chapterId, pageNumber, courseId);
     return await fileExists(audioPath);
 }
 
@@ -243,10 +486,11 @@ async function pageAudioFileExists(chapterId, pageNumber) {
  * Read a page audio file
  * @param {string} chapterId - Chapter ID
  * @param {number} pageNumber - Page number (1-indexed)
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {Promise<Buffer>}
  */
-async function readPageAudioFile(chapterId, pageNumber) {
-    const audioPath = getPageAudioFilePath(chapterId, pageNumber);
+async function readPageAudioFile(chapterId, pageNumber, courseId = null) {
+    const audioPath = getPageAudioFilePath(chapterId, pageNumber, courseId);
     return await fsPromises.readFile(audioPath);
 }
 
@@ -255,14 +499,15 @@ async function readPageAudioFile(chapterId, pageNumber) {
  * @param {string} chapterId - Chapter ID
  * @param {number} pageNumber - Page number (1-indexed)
  * @param {Buffer} audioBuffer - Audio file buffer
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {Promise<void>}
  */
-async function savePageAudioFile(chapterId, pageNumber, audioBuffer) {
-    const pageDir = getPageAudioDir(chapterId);
+async function savePageAudioFile(chapterId, pageNumber, audioBuffer, courseId = null) {
+    const pageDir = getPageAudioDir(chapterId, courseId);
     // Ensure directory exists
     await fsPromises.mkdir(pageDir, { recursive: true });
     
-    const audioPath = getPageAudioFilePath(chapterId, pageNumber);
+    const audioPath = getPageAudioFilePath(chapterId, pageNumber, courseId);
     await fsPromises.writeFile(audioPath, audioBuffer);
 }
 
@@ -302,17 +547,32 @@ async function getAudioDuration(audioBuffer) {
  * @param {string} docId
  * @returns {string}
  */
-function getLipSyncFilePath(docId) {
+/**
+ * Get absolute path to a lip sync JSON file
+ * @param {string} docId - Document/Chapter ID
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @param {string} type - Type: 'chapter', 'quiz', 'qa' (optional)
+ * @returns {string}
+ */
+function getLipSyncFilePath(docId, courseId = null, type = null) {
+    // If courseId is provided, use new structure
+    if (courseId && type) {
+        const jsonSubDir = type === 'chapter' ? 'chapters' : type;
+        return path.join(getCourseJsonDir(courseId), jsonSubDir, `${docId}${constants.FILE_EXTENSIONS.JSON}`);
+    }
+    // Legacy path for backward compatibility
     return path.join(config.AUDIOS_DIR, `${docId}${constants.FILE_EXTENSIONS.JSON}`);
 }
 
 /**
  * Check if lipsync JSON exists
- * @param {string} docId
+ * @param {string} docId - Document/Chapter ID
+ * @param {string} courseId - Course ID (optional, for course-based structure)
+ * @param {string} type - Type: 'chapter', 'quiz', 'qa' (optional)
  * @returns {Promise<boolean>}
  */
-async function lipSyncFileExists(docId) {
-    const lipSyncPath = getLipSyncFilePath(docId);
+async function lipSyncFileExists(docId, courseId = null, type = null) {
+    const lipSyncPath = getLipSyncFilePath(docId, courseId, type);
     try {
         await fsPromises.access(lipSyncPath);
         return true;
@@ -323,11 +583,13 @@ async function lipSyncFileExists(docId) {
 
 /**
  * Read lip sync JSON file.
- * @param {string} docId
+ * @param {string} docId - Document/Chapter/Audio ID
+ * @param {string} [courseId] - Course ID (optional, for course-based structure)
+ * @param {string} [type] - Type: 'chapter', 'quiz', 'qa' (optional)
  * @returns {Promise<Object|null>}
  */
-async function readLipSyncFile(docId) {
-    const lipSyncPath = getLipSyncFilePath(docId);
+async function readLipSyncFile(docId, courseId = null, type = null) {
+    const lipSyncPath = getLipSyncFilePath(docId, courseId, type);
     try {
         await fsPromises.access(lipSyncPath);
         const content = await fsPromises.readFile(lipSyncPath, 'utf8');
@@ -396,6 +658,19 @@ async function deleteDocumentAssets(docId) {
  */
 async function getCourseMetadata(courseId) {
     try {
+        // Try new structure first
+        const newCoursesDir = getCourseUploadsDir(courseId);
+        const newJsonFilePath = path.join(newCoursesDir, `${courseId}.json`);
+        
+        try {
+            await fsPromises.access(newJsonFilePath);
+            const content = await fsPromises.readFile(newJsonFilePath, 'utf8');
+            return JSON.parse(content);
+        } catch {
+            // Fallback to legacy structure
+        }
+        
+        // Legacy structure
         const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
         const jsonFilePath = path.join(coursesDir, `${courseId}.json`);
         try {
@@ -420,48 +695,68 @@ async function getCourseMetadata(courseId) {
  * @returns {Promise<void>}
  */
 async function saveCourseMetadata(courseData) {
-    const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
+    // Use new structure
+    const coursesDir = getCourseUploadsDir(courseData.id);
     await fsPromises.mkdir(coursesDir, { recursive: true });
     const jsonFilePath = path.join(coursesDir, `${courseData.id}.json`);
     await fsPromises.writeFile(jsonFilePath, JSON.stringify(courseData, null, 2), 'utf8');
 }
 
 /**
- * Get all courses
+ * Get all courses (from media layout and legacy uploads/courses)
  * @returns {Promise<Array>} Array of course metadata
  */
 async function getAllCourses() {
+    const results = [];
     try {
-        const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
-        await fsPromises.mkdir(coursesDir, { recursive: true });
-        const files = await fsPromises.readdir(coursesDir);
-        
-        const courses = await Promise.all(
-            files
-                .filter(f => f.endsWith('.json'))
-                .map(async (f) => {
-                    try {
-                        const jsonContent = await fsPromises.readFile(
-                            path.join(coursesDir, f),
-                            'utf8'
-                        );
-                        const data = JSON.parse(jsonContent);
-                        return {
-                            id: data.id,
-                            courseName: data.courseName,
-                            courseDescription: data.courseDescription,
-                            chaptersCount: Array.isArray(data.chapters) ? data.chapters.length : 0,
-                            createdAt: data.createdAt,
-                            updatedAt: data.updatedAt
-                        };
-                    } catch (error) {
-                        console.error(`[FS Error] Failed to read course ${f}:`, error.message);
-                        return null;
+        // Media: scan media/{courseId}, skip _global
+        if (fs.existsSync(config.MEDIA_DIR)) {
+            const entries = await fsPromises.readdir(config.MEDIA_DIR, { withFileTypes: true });
+            for (const e of entries) {
+                if (!e.isDirectory() || e.name === '_global') continue;
+                const courseId = e.name;
+                try {
+                    const course = await getCourseMetadata(courseId);
+                    if (course) {
+                        results.push({
+                            id: course.id,
+                            courseName: course.courseName,
+                            courseDescription: course.courseDescription,
+                            chaptersCount: Array.isArray(course.chapters) ? course.chapters.length : 0,
+                            createdAt: course.createdAt,
+                            updatedAt: course.updatedAt
+                        });
                     }
-                })
-        );
-        
-        return courses.filter(course => course !== null);
+                } catch (err) {
+                    console.warn(`[FS] Skip course ${courseId}:`, err.message);
+                }
+            }
+        }
+        // Legacy: uploads/courses/*.json
+        const legacyDir = path.join(config.UPLOADS_DIR, 'courses');
+        if (fs.existsSync(legacyDir)) {
+            const files = await fsPromises.readdir(legacyDir);
+            for (const f of files) {
+                if (!f.endsWith('.json')) continue;
+                const courseId = f.replace(/\.json$/, '');
+                if (results.some(c => c.id === courseId)) continue;
+                try {
+                    const content = await fsPromises.readFile(path.join(legacyDir, f), 'utf8');
+                    const data = JSON.parse(content);
+                    results.push({
+                        id: data.id,
+                        courseName: data.courseName,
+                        courseDescription: data.courseDescription,
+                        chaptersCount: Array.isArray(data.chapters) ? data.chapters.length : 0,
+                        createdAt: data.createdAt,
+                        updatedAt: data.updatedAt
+                    });
+                } catch (error) {
+                    console.warn(`[FS] Failed to read legacy course ${f}:`, error.message);
+                }
+            }
+        }
+        return results;
     } catch (error) {
         if (error.code === 'ENOENT') {
             return [];
@@ -481,24 +776,34 @@ async function deleteCourseAssets(courseId) {
         return false;
     }
 
-    const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
-    const courseDir = path.join(coursesDir, courseId);
-    const courseJsonPath = path.join(coursesDir, `${courseId}.json`);
-
-    // Delete all chapters
+    // Delete all chapters (media paths)
     if (Array.isArray(course.chapters)) {
         for (const chapterRef of course.chapters) {
             await deleteChapterAssets(courseId, chapterRef.id);
         }
     }
 
-    // Delete course directory and JSON file
+    // Delete entire course media directory
+    const courseMediaDir = getCourseMediaDir(courseId);
     try {
-        if (await fileExists(courseDir)) {
-            await fsPromises.rm(courseDir, { recursive: true, force: true });
+        if (await fileExists(courseMediaDir)) {
+            await fsPromises.rm(courseMediaDir, { recursive: true, force: true });
         }
-        if (await fileExists(courseJsonPath)) {
-            await fsPromises.unlink(courseJsonPath);
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            throw error;
+        }
+    }
+
+    // Legacy: remove uploads/courses/{courseId} and uploads/courses/{courseId}.json
+    const legacyCourseDir = path.join(config.UPLOADS_DIR, 'courses', courseId);
+    const legacyJsonPath = path.join(config.UPLOADS_DIR, 'courses', `${courseId}.json`);
+    try {
+        if (await fileExists(legacyCourseDir)) {
+            await fsPromises.rm(legacyCourseDir, { recursive: true, force: true });
+        }
+        if (await fileExists(legacyJsonPath)) {
+            await fsPromises.unlink(legacyJsonPath);
         }
     } catch (error) {
         if (error.code !== 'ENOENT') {
@@ -521,11 +826,21 @@ async function deleteCourseAssets(courseId) {
  */
 async function getChapterMetadata(courseId, chapterId) {
     try {
-        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        // Media structure first
+        const chapterDir = getChapterUploadsDir(courseId, chapterId);
         const jsonFilePath = path.join(chapterDir, `${chapterId}.json`);
         try {
             await fsPromises.access(jsonFilePath);
             const content = await fsPromises.readFile(jsonFilePath, 'utf8');
+            return JSON.parse(content);
+        } catch {
+            // Legacy: uploads/courses/{courseId}/{chapterId}
+        }
+        const legacyDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        const legacyPath = path.join(legacyDir, `${chapterId}.json`);
+        try {
+            await fsPromises.access(legacyPath);
+            const content = await fsPromises.readFile(legacyPath, 'utf8');
             return JSON.parse(content);
         } catch (accessError) {
             if (accessError.code === 'ENOENT') {
@@ -545,7 +860,8 @@ async function getChapterMetadata(courseId, chapterId) {
  * @returns {Promise<void>}
  */
 async function saveChapterMetadata(chapterData) {
-    const chapterDir = path.join(config.UPLOADS_DIR, 'courses', chapterData.courseId, chapterData.id);
+    // Use new structure
+    const chapterDir = getChapterUploadsDir(chapterData.courseId, chapterData.id);
     await fsPromises.mkdir(chapterDir, { recursive: true });
     const jsonFilePath = path.join(chapterDir, `${chapterData.id}.json`);
     await fsPromises.writeFile(jsonFilePath, JSON.stringify(chapterData, null, 2), 'utf8');
@@ -558,42 +874,15 @@ async function saveChapterMetadata(chapterData) {
  */
 async function getChapterText(chapterId) {
     try {
-        // Find chapter by searching courses
-        const coursesDir = path.join(config.UPLOADS_DIR, 'courses');
-        
-        // Check if courses directory exists
-        try {
-            await fsPromises.access(coursesDir);
-        } catch {
-            return null; // Courses directory doesn't exist
+        const courseList = await getAllCourses();
+        for (const c of courseList) {
+            const course = await getCourseMetadata(c.id);
+            if (!course || !Array.isArray(course.chapters)) continue;
+            const chapterRef = course.chapters.find(ch => ch.id === chapterId);
+            if (!chapterRef) continue;
+            const chapter = await getChapterMetadata(course.id, chapterId);
+            if (chapter && chapter.text) return chapter.text;
         }
-        
-        const courses = await fsPromises.readdir(coursesDir);
-        
-        for (const courseFile of courses) {
-            if (!courseFile.endsWith('.json')) continue;
-            
-            try {
-                const coursePath = path.join(coursesDir, courseFile);
-                const courseContent = await fsPromises.readFile(coursePath, 'utf8');
-                const course = JSON.parse(courseContent);
-                
-                if (Array.isArray(course.chapters)) {
-                    const chapterRef = course.chapters.find(ch => ch.id === chapterId);
-                    if (chapterRef) {
-                        const chapter = await getChapterMetadata(course.id, chapterId);
-                        if (chapter && chapter.text) {
-                            return chapter.text;
-                        }
-                    }
-                }
-            } catch (error) {
-                // Skip invalid course files
-                console.warn(`[FS Error] Failed to read course ${courseFile}:`, error.message);
-                continue;
-            }
-        }
-        
         return null;
     } catch (error) {
         console.error(`[FS Error] Failed to read chapter text for ID ${chapterId}:`, error.message);
@@ -613,10 +902,9 @@ async function deleteChapterAssets(courseId, chapterId) {
         return false;
     }
 
-    const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
-    const chapterJsonPath = path.join(chapterDir, `${chapterId}.json`);
+    const chapterDir = getChapterUploadsDir(courseId, chapterId);
 
-    // Delete chapter directory (includes PDFs, WebP images, etc.)
+    // Delete chapter directory (includes PDFs, WebP images, metadata JSON)
     try {
         if (await fileExists(chapterDir)) {
             await fsPromises.rm(chapterDir, { recursive: true, force: true });
@@ -627,24 +915,32 @@ async function deleteChapterAssets(courseId, chapterId) {
         }
     }
 
-    // Delete audio files
-    const audioFiles = [
+    // Delete audio and lip-sync (media + legacy)
+    await deleteChapterAudioFiles(chapterId, courseId);
+    await deleteChapterLipSyncFile(chapterId, courseId);
+
+    const legacyAudioFiles = [
         path.join(config.AUDIOS_DIR, `${chapterId}${constants.FILE_EXTENSIONS.WAV}`),
         path.join(config.AUDIOS_DIR, `${chapterId}${constants.AUDIO_PREFIXES.SUMMARY}${constants.FILE_EXTENSIONS.WAV}`),
         getLipSyncFilePath(chapterId)
     ];
-
-    const deleteFile = async (filePath) => {
+    for (const fp of legacyAudioFiles) {
         try {
-            await fsPromises.unlink(filePath);
-        } catch (error) {
-            if (error.code !== 'ENOENT') {
-                throw error;
-            }
+            if (await fileExists(fp)) await fsPromises.unlink(fp);
+        } catch (e) {
+            if (e.code !== 'ENOENT') throw e;
         }
-    };
+    }
 
-    await Promise.all(audioFiles.map(deleteFile));
+    // Legacy chapter dir
+    const legacyChapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+    try {
+        if (await fileExists(legacyChapterDir)) {
+            await fsPromises.rm(legacyChapterDir, { recursive: true, force: true });
+        }
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
 
     // Remove chapter from course
     const course = await getCourseMetadata(courseId);
@@ -660,25 +956,51 @@ async function deleteChapterAssets(courseId, chapterId) {
 /**
  * Delete chapter audio files (main audio and page audios)
  * @param {string} chapterId - Chapter ID
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {Promise<{deleted: string[], errors: string[]}>} List of deleted files and errors
  */
-async function deleteChapterAudioFiles(chapterId) {
+async function deleteChapterAudioFiles(chapterId, courseId = null) {
     const deleted = [];
     const errors = [];
 
-    // Delete main chapter audio
-    const mainAudioPath = getAudioFilePath(chapterId);
-    try {
-        if (await fileExists(mainAudioPath)) {
-            await fsPromises.unlink(mainAudioPath);
-            deleted.push('main_audio');
+    // Delete main chapter audio (try both new and legacy structures)
+    if (courseId) {
+        // New structure
+        const mainAudioPath = getChapterAudioFilePath(chapterId, courseId, 'main');
+        const summaryAudioPath = getChapterAudioFilePath(chapterId, courseId, 'summary');
+        
+        try {
+            if (await fileExists(mainAudioPath)) {
+                await fsPromises.unlink(mainAudioPath);
+                deleted.push('main_audio');
+            }
+        } catch (error) {
+            errors.push(`main_audio: ${error.message}`);
         }
-    } catch (error) {
-        errors.push(`main_audio: ${error.message}`);
+        
+        try {
+            if (await fileExists(summaryAudioPath)) {
+                await fsPromises.unlink(summaryAudioPath);
+                deleted.push('summary_audio');
+            }
+        } catch (error) {
+            errors.push(`summary_audio: ${error.message}`);
+        }
+    } else {
+        // Legacy structure
+        const mainAudioPath = getAudioFilePath(chapterId);
+        try {
+            if (await fileExists(mainAudioPath)) {
+                await fsPromises.unlink(mainAudioPath);
+                deleted.push('main_audio');
+            }
+        } catch (error) {
+            errors.push(`main_audio: ${error.message}`);
+        }
     }
 
     // Delete page audio directory
-    const pageAudioDir = getPageAudioDir(chapterId);
+    const pageAudioDir = getPageAudioDir(chapterId, courseId);
     try {
         if (await fileExists(pageAudioDir)) {
             await fsPromises.rm(pageAudioDir, { recursive: true, force: true });
@@ -694,19 +1016,43 @@ async function deleteChapterAudioFiles(chapterId) {
 /**
  * Delete chapter lipsync file
  * @param {string} chapterId - Chapter ID
+ * @param {string} courseId - Course ID (optional, for course-based structure)
  * @returns {Promise<{deleted: boolean, error: string|null}>}
  */
-async function deleteChapterLipSyncFile(chapterId) {
-    const lipSyncPath = getLipSyncFilePath(chapterId);
+async function deleteChapterLipSyncFile(chapterId, courseId = null) {
+    // Try new structure first, then legacy
+    let lipSyncPath = null;
+    if (courseId) {
+        lipSyncPath = getLipSyncFilePath(chapterId, courseId, 'chapter');
+    } else {
+        lipSyncPath = getLipSyncFilePath(chapterId);
+    }
+
+    let deleted = false;
+    let error = null;
+
     try {
         if (await fileExists(lipSyncPath)) {
             await fsPromises.unlink(lipSyncPath);
-            return { deleted: true, error: null };
+            deleted = true;
         }
-        return { deleted: false, error: null };
-    } catch (error) {
-        return { deleted: false, error: error.message };
+    } catch (err) {
+        error = err.message;
     }
+
+    if (courseId) {
+        const pageLipSyncDir = getPageLipSyncDir(chapterId, courseId);
+        try {
+            if (await fileExists(pageLipSyncDir)) {
+                await fsPromises.rm(pageLipSyncDir, { recursive: true, force: true });
+                deleted = true;
+            }
+        } catch (err) {
+            error = error ? `${error}; ${err.message}` : err.message;
+        }
+    }
+
+    return { deleted, error };
 }
 
 module.exports = {
@@ -740,9 +1086,29 @@ module.exports = {
     pageAudioFileExists,
     readPageAudioFile,
     savePageAudioFile,
+    getPageLipSyncDir,
+    getPageLipSyncFilePath,
+    pageLipSyncFileExists,
+    readPageLipSyncFile,
     getAudioDuration,
     // Chapter regeneration functions
     deleteChapterAudioFiles,
     deleteChapterLipSyncFile,
+    // New course-based structure functions
+    getCourseMediaDir,
+    getCourseUploadsDir,
+    getCourseUploadsCourseDir,
+    getChapterUploadsDir,
+    getCourseFinalProjectsDir,
+    getFinalProjectDir,
+    getCourseLabsDir,
+    getLabDir,
+    getCourseAudiosDir,
+    getChapterAudiosDir,
+    getCourseJsonDir,
+    getChapterJsonDir,
+    getChapterAudioFilePath,
+    saveChapterAudio,
+    readChapterAudio,
 };
 

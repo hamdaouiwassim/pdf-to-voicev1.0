@@ -35,9 +35,14 @@ const config = {
     GEMINI_FLASH_MODEL: 'gemini-2.5-flash-preview-09-2025',
     GEMINI_TTS_MODEL: 'gemini-2.5-flash-preview-tts',
     
-    // Directories
-    UPLOADS_DIR: path.join(__dirname, '..', 'uploads'),
-    AUDIOS_DIR: path.join(__dirname, '..', 'audios'),
+    // Directories - Media folder architecture
+    // media/
+    //   {courseId}/uploads/courses/{courseId}/..., audios/..., json/...
+    //   _global/uploads/  (standalone docs, labs, final-projects)
+    //   _global/audios/   (standalone doc audio, QA, etc.)
+    MEDIA_DIR: path.join(__dirname, '..', 'media'),
+    UPLOADS_DIR: path.join(__dirname, '..', 'media', '_global', 'uploads'),
+    AUDIOS_DIR: path.join(__dirname, '..', 'media', '_global', 'audios'),
     
     // Audio Parameters
     SAMPLE_RATE: 24000,

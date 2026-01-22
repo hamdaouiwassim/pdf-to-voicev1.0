@@ -5,7 +5,6 @@ const fileUtils = require('../utils/fileUtils');
 const dbUtils = require('../utils/dbUtils');
 const audioUtils = require('../utils/audioUtils');
 const geminiService = require('../services/geminiService');
-const localTTSService = require('../services/localTTSService');
 const lipSyncService = require('../services/lipSyncService');
 const pdfToWebpUtils = require('../utils/pdfToWebpUtils');
 const config = require('../config/config');
@@ -101,14 +100,8 @@ async function extractStatementsByPage(chapterId, pdfBuffer) {
     }
 }
 
-async function ensureChapterAudio(chapterId) {
-    const audioPath = fileUtils.getAudioFilePath(chapterId);
-    if (await fileUtils.audioFileExists(chapterId)) {
-        return audioPath;
-    }
-
-    // Get chapter from database to get text content
-    // We need to find which course this chapter belongs to
+async function ensureChapterAudio(chapterId, courseId = null) {
+    // Get chapter from database to get text content and courseId
     const db = require('../config/database');
     const chapters = await db.query(
         'SELECT text_content, course_id FROM chapters WHERE id = ? LIMIT 1',
@@ -119,6 +112,21 @@ async function ensureChapterAudio(chapterId) {
         throw new Error('Chapter not found in database.');
     }
 
+    const chapterCourseId = chapters[0].course_id || courseId;
+    const audioPath = chapterCourseId
+        ? fileUtils.getChapterAudioFilePath(chapterId, chapterCourseId, 'main')
+        : fileUtils.getAudioFilePath(chapterId);
+
+    if (chapterCourseId) {
+        if (await fileUtils.fileExists(fileUtils.getChapterAudioFilePath(chapterId, chapterCourseId, 'main'))) {
+            return audioPath;
+        }
+    } else {
+        if (await fileUtils.audioFileExists(chapterId)) {
+            return audioPath;
+        }
+    }
+
     const text = chapters[0].text_content;
     if (!text) {
         throw new Error('Chapter content not found for audio generation.');
@@ -126,7 +134,11 @@ async function ensureChapterAudio(chapterId) {
 
     const { pcmBuffer } = await geminiService.generateTTS(text, config.TTS_VOICE_DOCUMENT);
     const wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-    await fileUtils.saveAudioFile(chapterId, wavBuffer);
+    if (chapterCourseId) {
+        await fileUtils.saveChapterAudio(chapterId, chapterCourseId, 'main', wavBuffer);
+    } else {
+        await fileUtils.saveAudioFile(chapterId, wavBuffer);
+    }
     return audioPath;
 }
 
@@ -157,8 +169,8 @@ async function createChapter(req, res) {
         // Generate unique ID for the chapter
         const chapterId = crypto.randomUUID();
 
-        // Create chapter directory
-        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        // Create chapter directory (using new structure)
+        const chapterDir = fileUtils.getChapterUploadsDir(courseId, chapterId);
         await fsPromises.mkdir(chapterDir, { recursive: true });
 
         // Initialize variables for PDF processing
@@ -312,7 +324,9 @@ async function createChapter(req, res) {
         // Store WebP images in database
         for (let i = 0; i < webpImages.length; i++) {
             const imgPath = webpImages[i];
-            const relativePath = path.relative(config.UPLOADS_DIR, imgPath);
+            // Calculate relative path from course uploads directory
+            const courseUploadsDir = fileUtils.getCourseUploadsDir(courseId);
+            const relativePath = path.relative(courseUploadsDir, imgPath);
             await dbUtils.addChapterImage(chapterId, {
                 imagePath: relativePath,
                 pageNumber: i + 1,
@@ -376,7 +390,26 @@ async function getChapters(req, res) {
         // Get all chapters from database
         const chapters = await dbUtils.getChaptersByCourseId(courseId);
 
-        res.json(chapters);
+        // Check TTS and lip sync status for each chapter
+        const chaptersWithStatus = await Promise.all(chapters.map(async (chapter) => {
+            const hasTTS = await fileUtils.fileExists(fileUtils.getChapterAudioFilePath(chapter.id, courseId, 'main'));
+            const hasLipSync = await fileUtils.lipSyncFileExists(chapter.id, courseId, 'chapter');
+            
+            // Check if page audio exists (at least one page)
+            let hasPageAudio = false;
+            if (chapter.numPagesText > 0) {
+                hasPageAudio = await fileUtils.pageAudioFileExists(chapter.id, 1, courseId);
+            }
+
+            return {
+                ...chapter,
+                hasTTS,
+                hasLipSync,
+                hasPageAudio
+            };
+        }));
+
+        res.json(chaptersWithStatus);
     } catch (error) {
         console.error("[Chapters List Error]:", error);
         res.status(500).json({
@@ -399,7 +432,22 @@ async function getChapter(req, res) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
 
-        res.json(chapter);
+        // Check if TTS and lip sync exist
+        const hasTTS = await fileUtils.fileExists(fileUtils.getChapterAudioFilePath(chapterId, courseId, 'main'));
+        const hasLipSync = await fileUtils.lipSyncFileExists(chapterId, courseId, 'chapter');
+        
+        // Check if page audio exists (at least one page)
+        let hasPageAudio = false;
+        if (chapter.numPagesText > 0) {
+            hasPageAudio = await fileUtils.pageAudioFileExists(chapterId, 1, courseId);
+        }
+
+        res.json({
+            ...chapter,
+            hasTTS,
+            hasLipSync,
+            hasPageAudio
+        });
     } catch (error) {
         console.error("[Chapter Get Error]:", error);
         res.status(500).json({
@@ -430,7 +478,8 @@ async function getChapterFile(req, res) {
             });
         }
 
-        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        // Use new structure
+        const chapterDir = fileUtils.getChapterUploadsDir(courseId, chapterId);
 
         if (type === 'webp' && page) {
             // Return WebP image for specific page
@@ -518,19 +567,18 @@ async function summarizeChapter(req, res) {
             return res.status(404).json({ error: 'Chapter content not found' });
         }
 
-        const summaryAudioId = `${chapterId}${constants.AUDIO_PREFIXES.SUMMARY}`;
         let wavBuffer = null;
         let summary = null;
 
         const summaryLanguage = language || 'fr';
 
         const hasCachedSummary = chapter.summary && chapter.summaryLanguage === summaryLanguage;
-        const hasCachedAudio = await fileUtils.audioFileExists(summaryAudioId);
+        const hasCachedAudio = await fileUtils.fileExists(fileUtils.getChapterAudioFilePath(chapterId, courseId, 'summary'));
 
         if (hasCachedSummary && hasCachedAudio) {
             console.log(`[Summary] Serving cached summary and audio for chapter ID: ${chapterId}`);
             summary = chapter.summary;
-            wavBuffer = await fileUtils.readAudioFile(summaryAudioId);
+            wavBuffer = await fileUtils.readChapterAudio(chapterId, courseId, 'summary');
         } else {
             const text = chapter.textContent || null;
 
@@ -549,42 +597,16 @@ async function summarizeChapter(req, res) {
             if (!hasCachedAudio) {
                 console.log(`[Summary] Generating audio from summary for chapter ID: ${chapterId}`);
 
-                // Priority: Gemini TTS -> Edge TTS -> Local TTS
-                try {
-                    // 1. Try Gemini TTS (User Priority)
-                    console.log(`[Summary] Attempting Gemini TTS...`);
-                    const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-                    wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-                    console.log(`[Summary] Generated audio using Gemini TTS`);
-                } catch (geminiError) {
-                    console.warn(`[Summary] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
+                // Use only Gemini TTS
+                console.log(`[Summary] Generating audio using Gemini TTS...`);
+                const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+                wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+                console.log(`[Summary] Generated audio using Gemini TTS`);
 
-                    // 2. Try Edge TTS (Fallback)
-                    try {
-                        const edgeTTSService = require('../services/edgeTTSService');
-                        wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
-                        console.log(`[Summary] Generated audio using Edge TTS (${summaryLanguage})`);
-                    } catch (edgeError) {
-                        console.warn(`[Summary] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
-
-                        // 3. Try Local TTS (Last Resort)
-                        try {
-                            if (process.platform === 'win32') {
-                                wavBuffer = await localTTSService.generateTTSLocal(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
-                                console.log(`[Summary] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
-                            } else {
-                                throw new Error('Local TTS not available on this platform');
-                            }
-                        } catch (localTtsError) {
-                            throw new Error(`All TTS services failed. Gemini: ${geminiError.message}, Edge: ${edgeError.message}, Local: ${localTtsError.message}`);
-                        }
-                    }
-                }
-
-                await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
+                await fileUtils.saveChapterAudio(chapterId, courseId, 'summary', wavBuffer);
                 console.log(`[Summary] Saved summary audio cache for chapter ID: ${chapterId}`);
             } else {
-                wavBuffer = await fileUtils.readAudioFile(summaryAudioId);
+                wavBuffer = await fileUtils.readChapterAudio(chapterId, courseId, 'summary');
             }
         }
 
@@ -621,30 +643,34 @@ async function generateChapterLipSync(req, res) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
 
-        const audioPath = await ensureChapterAudio(chapterId);
-        const lipSyncExists = await fileUtils.lipSyncFileExists(chapterId);
+        const audioPath = await ensureChapterAudio(chapterId, courseId);
+        const lipSyncExists = await fileUtils.lipSyncFileExists(chapterId, courseId, 'chapter');
 
         if (lipSyncExists && !force) {
-            const existingData = await fileUtils.readLipSyncFile(chapterId);
+            const existingData = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
             return res.json({
                 message: 'Lip sync already exists. Use ?force=true to regenerate.',
                 chapterId,
-                lipSyncFile: `/audios/${chapterId}.json`,
+                lipSyncFile: courseId ? `/api/courses/${courseId}/chapters/${chapterId}/lip-sync` : `/audios/${chapterId}.json`,
                 mouthCues: existingData?.mouthCues?.length || 0,
                 metadata: existingData?.metadata || null,
                 cached: true
             });
         }
 
-        const lipSyncPath = fileUtils.getLipSyncFilePath(chapterId);
+        // Generate new lip sync (using new structure)
+        const lipSyncPath = fileUtils.getLipSyncFilePath(chapterId, courseId, 'chapter');
+        const lipSyncDir = path.dirname(lipSyncPath);
+        await fsPromises.mkdir(lipSyncDir, { recursive: true });
+        
         await lipSyncService.generateLipSync(audioPath, lipSyncPath);
 
-        const lipSyncData = await fileUtils.readLipSyncFile(chapterId);
+        const lipSyncData = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
 
         res.json({
             message: 'Lip sync generated successfully.',
             chapterId,
-            lipSyncFile: `/audios/${chapterId}.json`,
+            lipSyncFile: courseId ? `/api/courses/${courseId}/chapters/${chapterId}/lip-sync` : `/audios/${chapterId}.json`,
             mouthCues: lipSyncData?.mouthCues?.length || 0,
             metadata: lipSyncData?.metadata || null,
             cached: false
@@ -653,6 +679,28 @@ async function generateChapterLipSync(req, res) {
         console.error("[Chapter Lip Sync Error]:", error);
         res.status(500).json({
             error: 'Failed to generate lip sync.',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Serve lip sync JSON for a chapter
+ * GET /api/courses/:courseId/chapters/:chapterId/lip-sync
+ */
+async function getChapterLipSync(req, res) {
+    try {
+        const { courseId, chapterId } = req.params;
+        const data = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
+        if (!data) {
+            return res.status(404).json({ error: 'Lip sync not found' });
+        }
+        res.setHeader('Content-Type', 'application/json');
+        res.json(data);
+    } catch (error) {
+        console.error('[Chapter Lip Sync GET Error]:', error);
+        res.status(500).json({
+            error: 'Failed to retrieve lip sync.',
             details: error.message
         });
     }
@@ -671,7 +719,8 @@ async function getChapterPageTimings(req, res) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
 
-        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        // Use new structure
+        const chapterDir = fileUtils.getChapterUploadsDir(courseId, chapterId);
         const textPdfPath = path.join(chapterDir, chapter.textFilename);
 
         if (!(await fileUtils.fileExists(textPdfPath))) {
@@ -799,10 +848,10 @@ async function getChapterPageTimings(req, res) {
             let audioPath = null;
             
             try {
-                if (await fileUtils.pageAudioFileExists(chapterId, pageNum)) {
-                    const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNum);
+                if (await fileUtils.pageAudioFileExists(chapterId, pageNum, courseId)) {
+                    const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNum, courseId);
                     pageDuration = await fileUtils.getAudioDuration(audioBuffer);
-                    audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNum);
+                    audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNum, courseId);
                     console.log(`[Page Timings] Found audio for page ${pageNum}, duration: ${pageDuration}s`);
                 }
             } catch (error) {
@@ -859,7 +908,8 @@ async function generatePageTTSForChapter(chapterId, textPdfFilename, courseId) {
         console.log(`[Chapter] Starting page TTS generation for chapter ${chapterId}...`);
         
         const pageTTSService = require('../services/pageTTSService');
-        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        // Use new structure
+        const chapterDir = fileUtils.getChapterUploadsDir(courseId, chapterId);
         const textPdfPath = path.join(chapterDir, textPdfFilename);
 
         if (!(await fileUtils.fileExists(textPdfPath))) {
@@ -971,7 +1021,7 @@ async function generatePageTTSForChapter(chapterId, textPdfFilename, courseId) {
         pageWordCounts.sort((a, b) => a.page - b.page);
 
         // Generate TTS for all pages
-        const results = await pageTTSService.generateAllPagesTTS(pageWordCounts, chapterId, 'fr-FR', 3);
+        const results = await pageTTSService.generateAllPagesTTS(pageWordCounts, chapterId, 'fr-FR', 3, courseId);
         
         const successCount = results.filter(r => r.success).length;
         console.log(`[Chapter] Generated TTS for ${successCount}/${pageWordCounts.length} pages in chapter ${chapterId}`);
@@ -1055,28 +1105,38 @@ async function regenerateChapterTTS(req, res) {
         console.log(`[Chapter] Regenerating TTS for chapter ${chapterId}...`);
 
         // Delete old audio files
-        const deleteResult = await fileUtils.deleteChapterAudioFiles(chapterId);
+        const deleteResult = await fileUtils.deleteChapterAudioFiles(chapterId, courseId);
         console.log(`[Chapter] Deleted audio files: ${deleteResult.deleted.join(', ')}`);
         if (deleteResult.errors.length > 0) {
             console.warn(`[Chapter] Errors deleting some files: ${deleteResult.errors.join(', ')}`);
         }
 
-        // Regenerate page TTS (this will also generate main audio if needed)
-        generatePageTTSForChapter(chapterId, chapter.textFilename, courseId)
-            .then((results) => {
-                const successCount = results.filter(r => r.success).length;
-                console.log(`[Chapter] Completed TTS regeneration for chapter ${chapterId}: ${successCount}/${results.length} pages`);
-            })
-            .catch((error) => {
-                console.error(`[Chapter] TTS regeneration failed for chapter ${chapterId}:`, error.message);
-            });
+        // Regenerate page TTS (wait for completion, not in background)
+        console.log(`[Chapter] Starting TTS generation for all pages...`);
+        const results = await generatePageTTSForChapter(chapterId, chapter.textFilename, courseId);
+        
+        const successCount = results.filter(r => r.success).length;
+        const totalPages = results.length;
+        const failedPages = results.filter(r => !r.success);
+        
+        console.log(`[Chapter] Completed TTS regeneration for chapter ${chapterId}: ${successCount}/${totalPages} pages`);
+
+        if (failedPages.length > 0) {
+            console.warn(`[Chapter] Failed pages: ${failedPages.map(r => r.page).join(', ')}`);
+        }
 
         res.json({
-            message: 'TTS regeneration started',
+            message: 'TTS regeneration completed',
             chapterId: chapterId,
-            status: 'processing',
+            status: 'completed',
             deletedFiles: deleteResult.deleted,
-            errors: deleteResult.errors
+            errors: deleteResult.errors,
+            results: {
+                totalPages: totalPages,
+                successCount: successCount,
+                failedCount: failedPages.length,
+                failedPages: failedPages.map(r => ({ page: r.page, error: r.error }))
+            }
         });
     } catch (error) {
         console.error("[Chapter TTS Regeneration Error]:", error);
@@ -1103,7 +1163,7 @@ async function regenerateChapterLipSync(req, res) {
         console.log(`[Chapter] Regenerating lip sync for chapter ${chapterId}...`);
 
         // Delete old lip sync file
-        const deleteResult = await fileUtils.deleteChapterLipSyncFile(chapterId);
+        const deleteResult = await fileUtils.deleteChapterLipSyncFile(chapterId, courseId);
         if (deleteResult.error) {
             console.warn(`[Chapter] Error deleting lip sync: ${deleteResult.error}`);
         } else if (deleteResult.deleted) {
@@ -1111,19 +1171,22 @@ async function regenerateChapterLipSync(req, res) {
         }
 
         // Ensure audio exists before generating lip sync
-        const audioPath = await ensureChapterAudio(chapterId);
+        const audioPath = await ensureChapterAudio(chapterId, courseId);
 
-        // Generate new lip sync
-        const lipSyncPath = fileUtils.getLipSyncFilePath(chapterId);
+        // Generate new lip sync (using new structure)
+        const lipSyncPath = fileUtils.getLipSyncFilePath(chapterId, courseId, 'chapter');
+        const lipSyncDir = path.dirname(lipSyncPath);
+        await fsPromises.mkdir(lipSyncDir, { recursive: true });
+        
         const lipSyncService = require('../services/lipSyncService');
         await lipSyncService.generateLipSync(audioPath, lipSyncPath);
 
-        const lipSyncData = await fileUtils.readLipSyncFile(chapterId);
+        const lipSyncData = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
 
         res.json({
             message: 'Lip sync regenerated successfully.',
             chapterId,
-            lipSyncFile: `/audios/${chapterId}.json`,
+            lipSyncFile: courseId ? `/api/courses/${courseId}/chapters/${chapterId}/lip-sync` : `/audios/${chapterId}.json`,
             mouthCues: lipSyncData?.mouthCues?.length || 0,
             metadata: lipSyncData?.metadata || null,
             deleted: deleteResult.deleted
@@ -1159,7 +1222,7 @@ async function getChapterPageAudio(req, res) {
 
         // Check if page audio exists
         const fileUtils = require('../utils/fileUtils');
-        if (!(await fileUtils.pageAudioFileExists(chapterId, pageNum))) {
+        if (!(await fileUtils.pageAudioFileExists(chapterId, pageNum, courseId))) {
             return res.status(404).json({ 
                 error: 'Page audio not found',
                 details: `Audio for page ${pageNum} has not been generated yet. Please generate TTS for this chapter first.`
@@ -1167,13 +1230,11 @@ async function getChapterPageAudio(req, res) {
         }
 
         // Read and return audio file
-        const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNum);
+        const audioBuffer = await fileUtils.readPageAudioFile(chapterId, pageNum, courseId);
         const duration = await fileUtils.getAudioDuration(audioBuffer);
 
-        // Determine MIME type (WAV or MP3)
-        // Check if it's MP3 (Edge TTS) or WAV (Gemini/Local TTS)
-        const isMP3 = audioBuffer[0] === 0x49 && audioBuffer[1] === 0x44 && audioBuffer[2] === 0x33; // ID3 tag
-        const mimeType = isMP3 ? 'audio/mpeg' : 'audio/wav';
+        // Determine MIME type (always WAV with Gemini TTS)
+        const mimeType = 'audio/wav';
 
         res.setHeader('Content-Type', mimeType);
         res.setHeader('Content-Length', audioBuffer.length);
@@ -1183,6 +1244,43 @@ async function getChapterPageAudio(req, res) {
         console.error("[Chapter Page Audio Error]:", error);
         res.status(500).json({
             error: 'Failed to retrieve page audio.',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Get lip sync JSON for a specific page
+ * GET /api/courses/:courseId/chapters/:chapterId/lip-sync/:pageNumber
+ */
+async function getChapterPageLipSync(req, res) {
+    try {
+        const { courseId, chapterId, pageNumber } = req.params;
+
+        const chapter = await dbUtils.getChapterById(courseId, chapterId);
+        if (!chapter) {
+            return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        const pageNum = parseInt(pageNumber, 10);
+        if (isNaN(pageNum) || pageNum < 1) {
+            return res.status(400).json({ error: 'Invalid page number' });
+        }
+
+        if (!(await fileUtils.pageLipSyncFileExists(chapterId, pageNum, courseId))) {
+            return res.status(404).json({
+                error: 'Page lip sync not found',
+                details: `Lip sync for page ${pageNum} has not been generated yet.`
+            });
+        }
+
+        const data = await fileUtils.readPageLipSyncFile(chapterId, pageNum, courseId);
+        res.setHeader('Content-Type', 'application/json');
+        res.json(data);
+    } catch (error) {
+        console.error("[Chapter Page Lip Sync Error]:", error);
+        res.status(500).json({
+            error: 'Failed to retrieve page lip sync.',
             details: error.message
         });
     }
@@ -1285,7 +1383,8 @@ async function updateChapter(req, res) {
             return res.status(400).json({ error: 'Statements PDF file must be application/pdf' });
         }
 
-        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, chapterId);
+        // Use new structure
+        const chapterDir = fileUtils.getChapterUploadsDir(courseId, chapterId);
         await fsPromises.mkdir(chapterDir, { recursive: true });
 
         // Process PDF files if provided
@@ -1365,7 +1464,9 @@ async function updateChapter(req, res) {
                 // Store WebP images in database
                 for (let i = 0; i < webpImages.length; i++) {
                     const imgPath = webpImages[i];
-                    const relativePath = path.relative(config.UPLOADS_DIR, imgPath);
+                    // Calculate relative path from course uploads directory
+                    const courseUploadsDir = fileUtils.getCourseUploadsDir(courseId);
+                    const relativePath = path.relative(courseUploadsDir, imgPath);
                     await dbUtils.addChapterImage(chapterId, {
                         imagePath: relativePath,
                         pageNumber: i + 1,
@@ -1541,6 +1642,8 @@ module.exports = {
     getChapters,
     getChapter,
     getChapterFile,
+    getChapterLipSync,
+    getChapterPageLipSync,
     summarizeChapter,
     generateChapterLipSync,
     getChapterPageTimings,

@@ -4,7 +4,6 @@ const fsPromises = require('fs').promises;
 const fileUtils = require('../utils/fileUtils');
 const audioUtils = require('../utils/audioUtils');
 const geminiService = require('../services/geminiService');
-const localTTSService = require('../services/localTTSService');
 const lipSyncService = require('../services/lipSyncService');
 const config = require('../config/config');
 const constants = require('../utils/constants');
@@ -388,40 +387,12 @@ async function summarizeDocument(req, res) {
             metadata.summaryTimestamp = new Date().toISOString();
             await fileUtils.saveDocumentMetadata(metadata);
 
-            // Generate audio if not cached (use French voice)
-            // Priority: Gemini TTS -> Edge TTS -> Local TTS
+            // Generate audio if not cached using only Gemini TTS
             if (!hasCachedAudio) {
-                console.log(`[Summary] Generating audio from summary for doc ID: ${docId}`);
-
-                try {
-                    // 1. Try Gemini TTS
-                    const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-                    wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-                    console.log(`[Summary] Generated audio using Gemini TTS`);
-                } catch (geminiError) {
-                    console.warn(`[Summary] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
-
-                    // 2. Try Edge TTS
-                    try {
-                        const edgeTTSService = require('../services/edgeTTSService');
-                        wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
-                        console.log(`[Summary] Generated audio using Edge TTS (${summaryLanguage})`);
-                    } catch (edgeError) {
-                        console.warn(`[Summary] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
-
-                        // 3. Try Local TTS
-                        try {
-                            if (process.platform === 'win32') {
-                                wavBuffer = await localTTSService.generateTTSLocal(summary, summaryLanguage === 'fr' ? 'fr-FR' : 'en-US');
-                                console.log(`[Summary] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
-                            } else {
-                                throw new Error('Local TTS not available on this platform');
-                            }
-                        } catch (localTtsError) {
-                            throw new Error(`All TTS services failed. Gemini: ${geminiError.message}, Edge: ${edgeError.message}, Local: ${localTtsError.message}`);
-                        }
-                    }
-                }
+                console.log(`[Summary] Generating audio from summary for doc ID: ${docId} using Gemini TTS`);
+                const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+                wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+                console.log(`[Summary] Generated audio using Gemini TTS`);
 
                 await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
                 console.log(`[Summary] Saved summary audio cache for doc ID: ${docId}`);
@@ -507,7 +478,7 @@ async function generateSummaryAudio(req, res) {
 
         // Generate TTS audio from summary (regenerate if language mismatch or not cached)
         // Generate TTS audio from summary (regenerate if language mismatch or not cached)
-        // Priority: Gemini TTS -> Edge TTS -> Local TTS
+        // Use only Gemini TTS
         let wavBuffer;
         const ttsLanguage = summaryLanguage === 'fr' ? 'fr-FR' :
             summaryLanguage === 'en' ? 'en-US' :
@@ -516,35 +487,10 @@ async function generateSummaryAudio(req, res) {
                         summaryLanguage === 'it' ? 'it-IT' :
                             summaryLanguage === 'pt' ? 'pt-BR' : 'fr-FR';
 
-        try {
-            // 1. Try Gemini TTS
-            const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
-            wavBuffer = audioUtils.pcmToWav(pcmBuffer);
-            console.log(`[Summary Audio] Generated audio using Gemini TTS`);
-        } catch (geminiError) {
-            console.warn(`[Summary Audio] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
-
-            // 2. Try Edge TTS
-            try {
-                const edgeTTSService = require('../services/edgeTTSService');
-                wavBuffer = await edgeTTSService.generateTTSWithEdge(summary, ttsLanguage);
-                console.log(`[Summary Audio] Generated audio using Edge TTS (${summaryLanguage})`);
-            } catch (edgeError) {
-                console.warn(`[Summary Audio] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
-
-                // 3. Try Local TTS
-                try {
-                    if (process.platform === 'win32') {
-                        wavBuffer = await localTTSService.generateTTSLocal(summary, ttsLanguage);
-                        console.log(`[Summary Audio] Generated audio using Local TTS (Windows SAPI, ${summaryLanguage})`);
-                    } else {
-                        throw new Error('Local TTS not available on this platform');
-                    }
-                } catch (localTtsError) {
-                    throw new Error(`All TTS services failed. Gemini: ${geminiError.message}, Edge: ${edgeError.message}, Local: ${localTtsError.message}`);
-                }
-            }
-        }
+        // Use only Gemini TTS
+        const { pcmBuffer } = await geminiService.generateTTS(summary, config.TTS_VOICE_DOCUMENT);
+        wavBuffer = audioUtils.pcmToWav(pcmBuffer);
+        console.log(`[Summary Audio] Generated audio using Gemini TTS`);
         await fileUtils.saveAudioFile(summaryAudioId, wavBuffer);
 
         console.log(`[Summary Audio] Saved audio cache for doc ID: ${docId}`);

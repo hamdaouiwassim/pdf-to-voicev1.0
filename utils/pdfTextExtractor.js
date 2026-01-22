@@ -73,7 +73,9 @@ async function getTextPdfPath(docId, metadata = null, courseId = null) {
         if (!chapter.textFilename) {
             throw new Error('Chapter text PDF filename not found');
         }
-        const chapterDir = path.join(config.UPLOADS_DIR, 'courses', courseId, docId);
+        // Use new structure
+        const fileUtils = require('./fileUtils');
+        const chapterDir = fileUtils.getChapterUploadsDir(courseId, docId);
         return path.join(chapterDir, chapter.textFilename);
     }
 

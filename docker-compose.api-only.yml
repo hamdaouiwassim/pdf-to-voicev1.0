@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api-only
+    container_name: titan-academy-api-only
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3002"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3002
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # No database configuration - API runs without MySQL
+      # The API will detect missing DB config and continue without it
+    volumes:
+      - ./media:/app/media
+      - ./temp:/app/temp
+      - ./.env:/app/.env
+    networks:
+      - api-network
+
+networks:
+  api-network:
+    driver: bridge

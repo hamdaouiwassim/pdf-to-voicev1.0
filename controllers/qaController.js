@@ -3,8 +3,6 @@ const fileUtils = require('../utils/fileUtils');
 const audioUtils = require('../utils/audioUtils');
 const geminiService = require('../services/geminiService');
 const freeAIService = require('../services/freeAIService');
-const edgeTTSService = require('../services/edgeTTSService');
-const localTTSService = require('../services/localTTSService');
 const config = require('../config/config');
 const constants = require('../utils/constants');
 
@@ -33,38 +31,15 @@ async function answerQuestion(req, res) {
                     answer = await freeAIService.generateFreeQAAnswer(question.trim(), systemPrompt);
                     console.log(`[QA] Generated answer using free AI service`);
 
-                    // Try to generate audio (optional - don't fail if TTS fails)
-                    // Priority: Gemini TTS -> Edge TTS -> Local TTS
+                    // Try to generate audio using Gemini TTS only
                     try {
-                        // 1. Try Gemini TTS (User Priority)
                         const { pcmBuffer } = await geminiService.generateTTS(answer, config.TTS_VOICE_QA);
                         audioBuffer = audioUtils.pcmToWav(pcmBuffer);
                         console.log(`[QA] Generated audio using Gemini TTS`);
                     } catch (geminiError) {
-                        console.warn(`[QA] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
-
-                        // 2. Try Edge TTS (Fallback)
-                        try {
-                            // QA responses are always in French (matching the system prompt)
-                            audioBuffer = await edgeTTSService.generateTTSWithEdge(answer, 'fr-FR');
-                            console.log(`[QA] Generated audio using Edge TTS (French)`);
-                        } catch (ttsError) {
-                            console.warn(`[QA] Edge TTS failed (${ttsError.message}). Trying Local TTS...`);
-
-                            // 3. Try Local TTS (Last Resort)
-                            try {
-                                if (process.platform === 'win32') {
-                                    audioBuffer = await localTTSService.generateTTSLocal(answer, 'fr-FR');
-                                    console.log(`[QA] Generated audio using Local TTS (Windows SAPI, French)`);
-                                } else {
-                                    throw new Error('Local TTS not available on this platform');
-                                }
-                            } catch (localTtsError) {
-                                console.warn(`[QA] All TTS services failed:`, localTtsError.message);
-                                // Continue without audio - answer is still available
-                                audioBuffer = null;
-                            }
-                        }
+                        console.warn(`[QA] Gemini TTS failed (${geminiError.message}). Audio generation skipped.`);
+                        // Continue without audio - answer is still available
+                        audioBuffer = null;
                     }
                 } catch (freeAIError) {
                     console.warn(`[QA] Free AI failed, falling back to Google Gemini:`, freeAIError.message);
@@ -72,36 +47,14 @@ async function answerQuestion(req, res) {
                         // Fallback to Google Gemini for text generation
                         answer = await geminiService.generateText(question.trim(), systemPrompt);
 
-                        // Try to generate audio (optional)
-                        // Priority: Gemini TTS -> Edge TTS -> Local TTS
+                        // Try to generate audio using Gemini TTS only
                         try {
-                            // 1. Try Gemini TTS
                             const { pcmBuffer } = await geminiService.generateTTS(answer, config.TTS_VOICE_QA);
                             audioBuffer = audioUtils.pcmToWav(pcmBuffer);
                             console.log(`[QA] Generated audio using Gemini TTS`);
                         } catch (geminiError) {
-                            console.warn(`[QA] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
-
-                            // 2. Try Edge TTS
-                            try {
-                                audioBuffer = await edgeTTSService.generateTTSWithEdge(answer, 'fr-FR');
-                                console.log(`[QA] Generated audio using Edge TTS (fallback)`);
-                            } catch (edgeError) {
-                                console.warn(`[QA] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
-
-                                // 3. Try Local TTS
-                                try {
-                                    if (process.platform === 'win32') {
-                                        audioBuffer = await localTTSService.generateTTSLocal(answer, 'fr-FR');
-                                        console.log(`[QA] Generated audio using Local TTS (Windows SAPI, French)`);
-                                    } else {
-                                        throw new Error('Local TTS not available on this platform');
-                                    }
-                                } catch (localTtsError) {
-                                    console.warn(`[QA] All TTS services failed:`, localTtsError.message);
-                                    audioBuffer = null;
-                                }
-                            }
+                            console.warn(`[QA] Gemini TTS failed (${geminiError.message}). Audio generation skipped.`);
+                            audioBuffer = null;
                         }
                     } catch (geminiError) {
                         // If even Gemini text generation fails, throw error
@@ -112,36 +65,14 @@ async function answerQuestion(req, res) {
                 // Use Google Gemini (original behavior)
                 answer = await geminiService.generateText(question.trim(), systemPrompt);
 
-                // Try to generate audio (optional)
-                // Priority: Gemini TTS -> Edge TTS -> Local TTS
+                // Try to generate audio using Gemini TTS only
                 try {
-                    // 1. Try Gemini TTS
                     const { pcmBuffer } = await geminiService.generateTTS(answer, config.TTS_VOICE_QA);
                     audioBuffer = audioUtils.pcmToWav(pcmBuffer);
                     console.log(`[QA] Generated audio using Gemini TTS`);
                 } catch (geminiError) {
-                    console.warn(`[QA] Gemini TTS failed (${geminiError.message}). Trying Edge TTS...`);
-
-                    // 2. Try Edge TTS
-                    try {
-                        audioBuffer = await edgeTTSService.generateTTSWithEdge(answer, 'fr-FR');
-                        console.log(`[QA] Generated audio using Edge TTS (fallback)`);
-                    } catch (edgeError) {
-                        console.warn(`[QA] Edge TTS failed (${edgeError.message}). Trying Local TTS...`);
-
-                        // 3. Try Local TTS
-                        try {
-                            if (process.platform === 'win32') {
-                                audioBuffer = await localTTSService.generateTTSLocal(answer, 'fr-FR');
-                                console.log(`[QA] Generated audio using Local TTS (Windows SAPI, French)`);
-                            } else {
-                                throw new Error('Local TTS not available on this platform');
-                            }
-                        } catch (localTtsError) {
-                            console.warn(`[QA] All TTS services failed:`, localTtsError.message);
-                            audioBuffer = null;
-                        }
-                    }
+                    console.warn(`[QA] Gemini TTS failed (${geminiError.message}). Audio generation skipped.`);
+                    audioBuffer = null;
                 }
             }
 

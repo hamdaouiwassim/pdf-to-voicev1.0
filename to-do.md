@@ -1,0 +1,1 @@
+- Enhance the UI for backend courses mangaments and chapters , quiz each functionalites should be in seperate page non inside a modal , hide the buttons TTs and lib sync after first call to them and replace them by regenerate tts , regenerate lib sync. 
