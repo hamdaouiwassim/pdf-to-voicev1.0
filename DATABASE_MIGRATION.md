@@ -92,7 +92,7 @@ Create a migration script to:
 
 Run the creation script:
 ```bash
-docker compose exec api node scripts/createDatabaseTables.js
+  scripts/createDatabaseTables.js
 ```
 
 ### Can't find courses/chapters?

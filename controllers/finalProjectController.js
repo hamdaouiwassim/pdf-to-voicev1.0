@@ -183,16 +183,17 @@ async function addDocument(req, res) {
         }
 
         if (!pdfFile) {
-            return res.status(400).json({ error: 'PDF file is required' });
+            return res.status(400).json({ error: 'PDF or ZIP file is required' });
         }
 
-        // Validate PDF file
-        if (pdfFile.mimetype !== 'application/pdf') {
-            return res.status(400).json({ error: 'PDF resource must be a PDF file' });
+        // Validate file type (PDF or ZIP)
+        const validTypes = ['application/pdf', 'application/zip', 'application/x-zip-compressed'];
+        if (!validTypes.includes(pdfFile.mimetype)) {
+            return res.status(400).json({ error: 'Resource must be a PDF or ZIP file' });
         }
 
         if (pdfFile.size > 50 * 1024 * 1024) { // 50MB limit
-            return res.status(400).json({ error: 'PDF resource must be less than 50MB' });
+            return res.status(400).json({ error: 'Resource must be less than 50MB' });
         }
 
         // Get final project
@@ -205,8 +206,8 @@ async function addDocument(req, res) {
         const projectDir = fileUtils.getFinalProjectDir(courseId, project.id);
         await fs.mkdir(projectDir, { recursive: true });
 
-        // Save PDF file
-        const ext = path.extname(pdfFile.name) || '.pdf';
+        // Save PDF/ZIP file
+        const ext = path.extname(pdfFile.name) || (pdfFile.mimetype === 'application/pdf' ? '.pdf' : '.zip');
         const documentId = crypto.randomUUID();
         const pdfResource = `document_${documentId}${ext}`;
         const pdfPath = path.join(projectDir, pdfResource);
@@ -271,6 +272,14 @@ async function getDocumentPdf(req, res) {
             return res.status(404).json({ error: 'PDF file not found' });
         }
 
+        const ext = path.extname(document.pdfResource).toLowerCase();
+        if (ext === '.zip') {
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', `attachment; filename="${document.pdfResource}"`);
+        } else {
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="${document.pdfResource}"`);
+        }
         res.sendFile(path.resolve(pdfPath));
     } catch (error) {
         console.error('[Final Project] Error getting document PDF:', error);

@@ -158,9 +158,12 @@
                 const course = await response.json();
                 document.getElementById('inpCourseName').value = course.courseName || '';
                 document.getElementById('inpCourseDescription').value = course.courseDescription || '';
-                if (course.imageUrl) {
+                const courseImagePath = course.imageUrl || (course.courseImage
+                    ? `/uploads/courses/${courseId}/${course.courseImage}`
+                    : null);
+                if (courseImagePath) {
                     document.getElementById('courseImagePreview').classList.remove('hidden');
-                    document.getElementById('courseImagePreviewImg').src = course.imageUrl;
+                    document.getElementById('courseImagePreviewImg').src = courseImagePath;
                 }
             } catch (error) {
                 showResult('error', 'Failed to load course: ' + error.message);

@@ -124,16 +124,6 @@
                         <div id="visualFileName" class="mt-2 text-purple-600 font-medium text-sm hidden"></div>
                     </div>
 
-                    <div id="statementsPdfContainer"
-                        class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                        <input type="file" id="inpStatementsFile" accept=".pdf" class="hidden">
-                        <label for="inpStatementsFile" class="cursor-pointer">
-                            <i class="fas fa-file-alt text-4xl text-blue-500 mb-2"></i>
-                            <p class="text-gray-700 font-medium mb-1">Statements PDF (optional)</p>
-                            <p class="text-sm text-gray-500">PDF containing exercise statements</p>
-                        </label>
-                        <div id="statementsFileName" class="mt-2 text-blue-600 font-medium text-sm hidden"></div>
-                    </div>
                 </div>
 
                 <div class="flex gap-4 mt-6">
@@ -236,8 +226,7 @@
         // File inputs
         const fileInputMap = {
             'inpTextFile': 'textFileName',
-            'inpVisualFile': 'visualFileName',
-            'inpStatementsFile': 'statementsFileName'
+            'inpVisualFile': 'visualFileName'
         };
         
         Object.entries(fileInputMap).forEach(([inputId, displayId]) => {
@@ -293,7 +282,6 @@
         document.getElementById('btnUploadChapter').addEventListener('click', async () => {
             const textFile = document.getElementById('inpTextFile').files[0];
             const visualFile = document.getElementById('inpVisualFile').files[0];
-            const statementsFile = document.getElementById('inpStatementsFile').files[0];
             const videoLink = document.getElementById('inpVideoLink').value.trim();
             const chapterName = document.getElementById('inpChapterName').value.trim();
             const chapterDescription = document.getElementById('inpChapterDescription').value.trim();
@@ -311,7 +299,6 @@
             const formData = new FormData();
             if (textFile) formData.append('textPdfFile', textFile);
             if (visualFile) formData.append('visualPdfFile', visualFile);
-            if (statementsFile) formData.append('statementsPdfFile', statementsFile);
             if (videoLink) formData.append('video_link', videoLink);
             if (chapterName) formData.append('chapterName', chapterName);
             if (chapterDescription) formData.append('chapterDescription', chapterDescription);
@@ -325,10 +312,6 @@
                 if (!visualFile && !videoLink) {
                     // Keep existing visual file if no new one and no video link
                     formData.append('keepVisualFile', 'true');
-                }
-                if (!statementsFile) {
-                    // Keep existing statements file
-                    formData.append('keepStatementsFile', 'true');
                 }
             }
 

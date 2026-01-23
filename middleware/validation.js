@@ -266,7 +266,6 @@ function validatePythonLabRequest(req, res, next) {
 /**
  * Validate chapter file upload middleware
  * Requires both textPdfFile (for TTS) and visualPdfFile (for display)
- * statementsPdfFile is optional
  */
 function validateChapterUpload(req, res, next) {
     const videoLink = typeof req.body?.video_link === 'string' ? req.body.video_link.trim() : null;
@@ -310,7 +309,6 @@ function validateChapterUpload(req, res, next) {
 
     const textFile = req.files?.textPdfFile;
     const visualFile = req.files?.visualPdfFile;
-    const statementsFile = req.files?.statementsPdfFile;
     const chapterName = typeof req.body?.chapterName === 'string' ? req.body.chapterName.trim() : '';
 
     // Validate text PDF (only if provided)
@@ -340,21 +338,6 @@ function validateChapterUpload(req, res, next) {
         }
         if (!visualFile.name.toLowerCase().endsWith('.pdf')) {
             return res.status(400).json({ error: 'Visual PDF file must have .pdf extension' });
-        }
-    }
-
-    // Validate statements PDF (optional)
-    if (statementsFile) {
-        if (!config.ALLOWED_MIME_TYPES.includes(statementsFile.mimetype)) {
-            return res.status(400).json({ error: 'Statements PDF file must be application/pdf' });
-        }
-        if (statementsFile.size > config.MAX_FILE_SIZE) {
-            return res.status(400).json({ 
-                error: `Statements PDF file too large (max ${config.MAX_FILE_SIZE / 1024 / 1024}MB)` 
-            });
-        }
-        if (!statementsFile.name.toLowerCase().endsWith('.pdf')) {
-            return res.status(400).json({ error: 'Statements PDF file must have .pdf extension' });
         }
     }
 
