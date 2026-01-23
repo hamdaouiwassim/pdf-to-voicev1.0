@@ -69,8 +69,10 @@ async function generatePageTTS(pageText, chapterId, pageNumber, language = 'fr-F
 
     const audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNumber, courseId);
     const lipSyncPath = fileUtils.getPageLipSyncFilePath(chapterId, pageNumber, courseId);
+    console.log(`[Page TTS] Saved audio: ${audioPath}`);
     await fsPromises.mkdir(path.dirname(lipSyncPath), { recursive: true });
     await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+    console.log(`[Page TTS] Generated lip sync: ${lipSyncPath}`);
     
     console.log(`[Page TTS] Generated via Gemini TTS for page ${pageNumber}, duration: ${duration}s`);
 

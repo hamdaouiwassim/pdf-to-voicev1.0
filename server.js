@@ -34,6 +34,14 @@ const apiRoutes = require('./routes');
 // Initialize Express app
 const app = express();
 
+// Ensure media directory structure exists on startup
+try {
+    fileUtils.setupDirectories();
+    console.log('✓ Media directories ensured');
+} catch (error) {
+    console.error('❌ Failed to setup media directories:', error.message);
+}
+
 // --- Middleware ---
 // Configure CORS with explicit options
 // When credentials are included, origin cannot be '*', must be specific origin(s)

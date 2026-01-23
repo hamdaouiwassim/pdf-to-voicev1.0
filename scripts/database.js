@@ -97,6 +97,7 @@ async function createTables() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
         console.log('✓ Courses table created/verified');
+        await ensureCourseImageColumn();
 
         // Create chapters table
         await db.query(`
@@ -299,6 +300,62 @@ async function createTables() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
         console.log('✓ Quiz attempts table created/verified');
+        await ensureQuizQuestionSchema();
+
+        // Create final_projects table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS final_projects (
+                id VARCHAR(36) PRIMARY KEY,
+                course_id VARCHAR(36) NOT NULL,
+                project_name VARCHAR(255) NOT NULL,
+                project_description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_course_final_project (course_id),
+                INDEX idx_course_id (course_id),
+                INDEX idx_project_name (project_name),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        console.log('✓ Final projects table created/verified');
+
+        // Create final_project_documents table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS final_project_documents (
+                id VARCHAR(36) PRIMARY KEY,
+                final_project_id VARCHAR(36) NOT NULL,
+                document_name VARCHAR(255) NOT NULL,
+                document_description TEXT,
+                pdf_resource VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (final_project_id) REFERENCES final_projects(id) ON DELETE CASCADE,
+                INDEX idx_final_project_id (final_project_id),
+                INDEX idx_document_name (document_name),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        console.log('✓ Final project documents table created/verified');
+
+        // Create final_project_submissions table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS final_project_submissions (
+                id VARCHAR(36) PRIMARY KEY,
+                final_project_id VARCHAR(36) NOT NULL,
+                user_email VARCHAR(255) NOT NULL,
+                file_resource VARCHAR(500),
+                comment TEXT,
+                submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (final_project_id) REFERENCES final_projects(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_user_final_project (final_project_id, user_email),
+                INDEX idx_final_project_id (final_project_id),
+                INDEX idx_user_email (user_email),
+                INDEX idx_submitted_at (submitted_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        console.log('✓ Final project submissions table created/verified');
 
         // Verify tables
         const tables = await db.query('SHOW TABLES');
@@ -313,6 +370,74 @@ async function createTables() {
     } catch (error) {
         console.error('Error creating tables:', error);
         throw error;
+    }
+}
+
+async function columnExists(tableName, columnName) {
+    const dbName = process.env.DB_NAME || 'titan_academy';
+    const result = await db.query(
+        `SELECT COUNT(*) AS count
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = ?
+           AND TABLE_NAME = ?
+           AND COLUMN_NAME = ?`,
+        [dbName, tableName, columnName]
+    );
+    return (result[0]?.count || 0) > 0;
+}
+
+async function indexExists(tableName, indexName) {
+    const dbName = process.env.DB_NAME || 'titan_academy';
+    const result = await db.query(
+        `SELECT COUNT(*) AS count
+         FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = ?
+           AND TABLE_NAME = ?
+           AND INDEX_NAME = ?`,
+        [dbName, tableName, indexName]
+    );
+    return (result[0]?.count || 0) > 0;
+}
+
+/**
+ * Ensure courses table has course_image column (migration-2025-12-16)
+ */
+async function ensureCourseImageColumn() {
+    if (await columnExists('courses', 'course_image')) {
+        console.log('✓ courses.course_image column exists');
+        return;
+    }
+    await db.query(`ALTER TABLE courses ADD COLUMN course_image VARCHAR(500) AFTER course_description`);
+    console.log('✓ Added courses.course_image column');
+}
+
+/**
+ * Ensure quiz_questions schema supports question_type and multiple answers (migration 005)
+ */
+async function ensureQuizQuestionSchema() {
+    if (await columnExists('quiz_questions', 'question_type') === false) {
+        await db.query(`ALTER TABLE quiz_questions ADD COLUMN question_type ENUM('single', 'multiple') DEFAULT 'single' AFTER options`);
+        console.log('✓ Added quiz_questions.question_type');
+    }
+    if (await columnExists('quiz_questions', 'correct_answer_indices') === false) {
+        await db.query(`ALTER TABLE quiz_questions ADD COLUMN correct_answer_indices JSON NULL AFTER correct_answer_index`);
+        console.log('✓ Added quiz_questions.correct_answer_indices');
+    }
+
+    // Ensure correct_answer_index allows NULL
+    try {
+        await db.query(`ALTER TABLE quiz_questions MODIFY COLUMN correct_answer_index INT NULL`);
+        console.log('✓ Updated quiz_questions.correct_answer_index to allow NULL');
+    } catch (error) {
+        console.warn('[DB] Could not modify correct_answer_index:', error.message);
+    }
+
+    // Backfill question_type for older rows
+    await db.query(`UPDATE quiz_questions SET question_type = 'single' WHERE question_type IS NULL`);
+
+    if (!(await indexExists('quiz_questions', 'idx_question_type'))) {
+        await db.query(`CREATE INDEX idx_question_type ON quiz_questions(question_type)`);
+        console.log('✓ Added idx_question_type on quiz_questions');
     }
 }
 
