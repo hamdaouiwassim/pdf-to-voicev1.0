@@ -190,6 +190,7 @@
             window.location.href = '/index.html';
         }
 
+
         // Check authentication
         async function checkAuthentication() {
             try {
@@ -272,6 +273,16 @@
                 if (chapter.videoLink) {
                     document.getElementById('inpVideoLink').value = chapter.videoLink;
                     document.getElementById('visualPdfContainer').classList.add('hidden');
+                }
+                if (chapter.textFilename) {
+                    const textDisplay = document.getElementById('textFileName');
+                    textDisplay.textContent = `Current: ${chapter.textFilename}`;
+                    textDisplay.classList.remove('hidden');
+                }
+                if (chapter.visualFilename && !chapter.videoLink) {
+                    const visualDisplay = document.getElementById('visualFileName');
+                    visualDisplay.textContent = `Current: ${chapter.visualFilename}`;
+                    visualDisplay.classList.remove('hidden');
                 }
             } catch (error) {
                 showError('Failed to load chapter: ' + error.message);
