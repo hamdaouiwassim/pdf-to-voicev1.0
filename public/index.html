@@ -720,36 +720,18 @@
                                         <button 
                                             onclick="regenerateChapterTTS('${currentCourseId}', '${chapter.id}')" 
                                             class="bg-teal-500 hover:bg-teal-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
-                                            title="Delete old TTS and regenerate"
+                                            title="Delete old TTS and regenerate (with lip sync)"
                                         >
                                             <i class="fas fa-redo"></i>
-                                            Regenerate TTS
+                                            Regenerate TTS + Lip Sync
                                         </button>
                                         ` : `
                                         <button 
-                                            onclick="chapterTTS('${currentCourseId}', '${chapter.id}')" 
+                                            onclick="chapterTtsAndLipSync('${currentCourseId}', '${chapter.id}')" 
                                             class="bg-green-500 hover:bg-green-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
                                         >
                                             <i class="fas fa-volume-up"></i>
-                                            TTS
-                                        </button>
-                                        `}
-                                        ${chapter.hasLipSync ? `
-                                        <button 
-                                            onclick="regenerateChapterLipSync('${currentCourseId}', '${chapter.id}')" 
-                                            class="bg-amber-500 hover:bg-amber-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
-                                            title="Delete old lip sync and regenerate"
-                                        >
-                                            <i class="fas fa-redo"></i>
-                                            Regenerate Lip Sync
-                                        </button>
-                                        ` : `
-                                        <button 
-                                            onclick="chapterLipSync('${currentCourseId}', '${chapter.id}')" 
-                                            class="bg-orange-500 hover:bg-orange-600 text-white text-xs py-1.5 px-3 rounded-lg transition-colors flex items-center gap-1"
-                                        >
-                                            <i class="fas fa-wave-square"></i>
-                                            Lip Sync
+                                            TTS + Lip Sync
                                         </button>
                                         `}
                                         <button 
@@ -929,7 +911,7 @@
                 const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/page-timings`, {
                     credentials: 'include'
                 });
-                if (!response.ok) return;
+                if (!response.ok) return { totalPages: 0, completedCount: 0 };
                 const data = await response.json();
                 const timings = normalizePageTimings(data);
                 const totalPages = timings.length;
@@ -968,8 +950,10 @@
                     }
                     clearTtsProgress();
                 }
+                return { totalPages, completedCount: completed.length };
             } catch (error) {
                 console.warn('TTS progress check failed:', error.message);
+                return { totalPages: 0, completedCount: 0 };
             }
         }
 
@@ -988,6 +972,18 @@
             }
         }
 
+        async function waitForPageAudioCompletion(courseId, chapterId, timeoutMs = 10 * 60 * 1000) {
+            const start = Date.now();
+            while (Date.now() - start < timeoutMs) {
+                const { totalPages, completedCount } = await updatePageAudioProgress(courseId, chapterId);
+                if (totalPages > 0 && completedCount === totalPages) {
+                    return true;
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            return false;
+        }
+
         async function ensureChapterHasText(courseId, chapterId) {
             try {
                 const response = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/file?type=text`, {
@@ -1000,11 +996,11 @@
             }
         }
 
-        // Chapter TTS (page-by-page)
-        window.chapterTTS = async function (courseId, chapterId) {
+        // Chapter TTS + Lip Sync (page-by-page)
+        window.chapterTtsAndLipSync = async function (courseId, chapterId) {
             currentCourseId = courseId;
             currentChapterId = chapterId;
-            document.getElementById('modalTitle').textContent = 'Page-by-Page TTS';
+            document.getElementById('modalTitle').textContent = 'TTS + Lip Sync';
             document.getElementById('modalContent').innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div><p class="mt-4 text-gray-600">Checking chapter files...</p></div>';
             document.getElementById('chapterModal').classList.remove('hidden');
 
@@ -1049,10 +1045,40 @@
                     `;
                     clearTtsProgress();
                     await updatePageAudioProgress(courseId, chapterId);
-                    ttsProgressInterval = setInterval(() => {
-                        updatePageAudioProgress(courseId, chapterId);
-                    }, 2000);
-                    // Reload chapters to update button states
+                    const completed = await waitForPageAudioCompletion(courseId, chapterId);
+                    clearTtsProgress();
+                    if (!completed) {
+                        document.getElementById('modalContent').innerHTML = `
+                            <div class="text-center py-8">
+                                <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                                <p class="text-red-600">TTS generation took too long. Please check logs.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    document.getElementById('modalContent').innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div><p class="mt-4 text-gray-600">Generating lip sync...</p></div>';
+                    const lipSyncResponse = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/lipsync`, {
+                        method: 'POST'
+                    });
+                    const lipSyncData = await lipSyncResponse.json();
+                    if (!lipSyncResponse.ok) {
+                        throw new Error(lipSyncData.error || 'Failed to generate lip sync');
+                    }
+                    document.getElementById('modalContent').innerHTML = `
+                        <div class="space-y-4">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-check-circle"></i>TTS + Lip Sync Completed
+                                </h4>
+                                <p class="text-sm text-gray-700">Page audio and lip sync files are ready.</p>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-700 space-y-2">
+                                <p><strong>Chapter ID:</strong> ${lipSyncData.chapterId || chapterId}</p>
+                                <p><strong>Mouth cues:</strong> ${lipSyncData.mouthCues || 0}</p>
+                                <p><strong>JSON file:</strong> <code>${lipSyncData.lipSyncFile}</code></p>
+                            </div>
+                        </div>
+                    `;
                     if (currentCourseId) {
                         loadChapters(currentCourseId);
                     }
@@ -1206,6 +1232,38 @@
                 }
 
                 clearTtsProgress();
+                let lipSyncHtml = '';
+                try {
+                    const lipSyncResponse = await fetch(`${API_BASE}/api/courses/${courseId}/chapters/${chapterId}/regenerate-lipsync`, {
+                        method: 'POST'
+                    });
+                    const lipSyncData = await lipSyncResponse.json();
+                    if (lipSyncResponse.ok) {
+                        lipSyncHtml = `
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-check-circle"></i>Lip Sync Regenerated
+                                </h4>
+                                <div class="text-sm text-gray-700 space-y-1">
+                                    <p><strong>Mouth cues:</strong> ${lipSyncData.mouthCues || 0}</p>
+                                    <p><strong>JSON file:</strong> <code>${lipSyncData.lipSyncFile}</code></p>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        lipSyncHtml = `
+                            <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-orange-700">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Failed to regenerate lip sync: ${lipSyncData.error || 'Unknown error'}
+                            </div>
+                        `;
+                    }
+                } catch (lipSyncError) {
+                    lipSyncHtml = `
+                        <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm text-orange-700">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>Failed to regenerate lip sync: ${lipSyncError.message}
+                        </div>
+                    `;
+                }
                 // Show success message with detailed results
                 let resultsHtml = '';
                 if (data.results) {
@@ -1245,6 +1303,7 @@
                                 <p class="text-orange-600"><strong>Warnings:</strong> ${data.errors.join(', ')}</p>
                             ` : ''}
                         </div>
+                        ${lipSyncHtml}
                         ${resultsHtml}
                     </div>
                 `;
