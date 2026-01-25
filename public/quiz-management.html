@@ -344,6 +344,13 @@
 
         function updateQuizOptions() {
             const container = document.getElementById('quizOptionsContainer');
+            const existingValues = [];
+            container.querySelectorAll('[data-option-index]').forEach((input) => {
+                const idx = parseInt(input.getAttribute('data-option-index'), 10);
+                if (!Number.isNaN(idx)) {
+                    existingValues[idx] = input.value;
+                }
+            });
             container.innerHTML = '';
             for (let i = 0; i < quizOptionsCount; i++) {
                 const optionDiv = document.createElement('div');
@@ -359,6 +366,10 @@
                         </button>
                     ` : ''}
                 `;
+                const input = optionDiv.querySelector(`[data-option-index="${i}"]`);
+                if (input && existingValues[i] !== undefined) {
+                    input.value = existingValues[i];
+                }
                 container.appendChild(optionDiv);
             }
             handleQuestionTypeChange();

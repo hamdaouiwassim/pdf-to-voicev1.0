@@ -15,6 +15,31 @@ async function generateTTS(req, res) {
         // Document ID validation is handled by middleware (validateDocIdInBody)
         const { docId, courseId } = req.body; // Support courseId for chapters
 
+        // Enforce page-by-page audio for chapters (no single file generation)
+        if (courseId) {
+            return res.status(400).json({
+                error: 'Single-file TTS is disabled for chapters',
+                details: 'Use /api/courses/:courseId/chapters/:chapterId/generate-page-audio instead.'
+            });
+        }
+
+        // If docId matches a chapter, block single-file generation as well
+        try {
+            const db = require('../config/database');
+            const chapters = await db.query(
+                'SELECT id, course_id FROM chapters WHERE id = ? LIMIT 1',
+                [docId]
+            );
+            if (chapters.length > 0) {
+                return res.status(400).json({
+                    error: 'Single-file TTS is disabled for chapters',
+                    details: `Use /api/courses/${chapters[0].course_id}/chapters/${docId}/generate-page-audio instead.`
+                });
+            }
+        } catch (lookupError) {
+            console.warn('[TTS] Chapter lookup failed, continuing as document:', lookupError.message);
+        }
+
         // 1. DATA RETRIEVAL - Use TEXT PDF extraction (same as page timings)
         // This ensures perfect synchronization between timings and TTS audio
         console.log(`[TTS] Extracting text from TEXT PDF for ${docId}${courseId ? ` (chapter in course ${courseId})` : ''}...`);

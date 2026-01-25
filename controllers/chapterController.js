@@ -643,37 +643,64 @@ async function generateChapterLipSync(req, res) {
             return res.status(404).json({ error: 'Chapter not found' });
         }
 
-        const audioPath = await ensureChapterAudio(chapterId, courseId);
-        const lipSyncExists = await fileUtils.lipSyncFileExists(chapterId, courseId, 'chapter');
+        // Force page-by-page lip sync generation (no single-file lip sync)
+        const pageAudioDir = fileUtils.getPageAudioDir(chapterId, courseId);
+        let audioFiles = [];
+        try {
+            audioFiles = await fsPromises.readdir(pageAudioDir);
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                return res.status(400).json({
+                    error: 'Page audio not found',
+                    details: 'Generate page-by-page audio before lip sync.'
+                });
+            }
+            throw error;
+        }
 
-        if (lipSyncExists && !force) {
-            const existingData = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
-            return res.json({
-                message: 'Lip sync already exists. Use ?force=true to regenerate.',
-                chapterId,
-                lipSyncFile: courseId ? `/api/courses/${courseId}/chapters/${chapterId}/lip-sync` : `/audios/${chapterId}.json`,
-                mouthCues: existingData?.mouthCues?.length || 0,
-                metadata: existingData?.metadata || null,
-                cached: true
+        const pageNumbers = audioFiles
+            .filter(name => /^page_\d+\.wav$/i.test(name))
+            .map(name => parseInt(name.replace(/^page_0*/, '').replace(/\.wav$/i, ''), 10))
+            .filter(num => !isNaN(num))
+            .sort((a, b) => a - b);
+
+        if (pageNumbers.length === 0) {
+            return res.status(400).json({
+                error: 'No page audio files found',
+                details: 'Generate page-by-page audio before lip sync.'
             });
         }
 
-        // Generate new lip sync (using new structure)
-        const lipSyncPath = fileUtils.getLipSyncFilePath(chapterId, courseId, 'chapter');
-        const lipSyncDir = path.dirname(lipSyncPath);
-        await fsPromises.mkdir(lipSyncDir, { recursive: true });
-        
-        await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+        const results = [];
+        const errors = [];
 
-        const lipSyncData = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
+        for (const pageNumber of pageNumbers) {
+            try {
+                if (!force && await fileUtils.pageLipSyncFileExists(chapterId, pageNumber, courseId)) {
+                    results.push({ page: pageNumber, cached: true });
+                    continue;
+                }
+                const audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNumber, courseId);
+                const lipSyncPath = fileUtils.getPageLipSyncFilePath(chapterId, pageNumber, courseId);
+                await fsPromises.mkdir(path.dirname(lipSyncPath), { recursive: true });
+                await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+                results.push({ page: pageNumber, cached: false });
+            } catch (pageError) {
+                console.error(`[Chapter Lip Sync] Failed for page ${pageNumber}:`, pageError.message);
+                errors.push({ page: pageNumber, error: pageError.message });
+            }
+        }
+
+        const cachedCount = results.filter(r => r.cached).length;
+        const generatedCount = results.length - cachedCount;
 
         res.json({
-            message: 'Lip sync generated successfully.',
+            message: 'Page lip sync generation completed.',
             chapterId,
-            lipSyncFile: courseId ? `/api/courses/${courseId}/chapters/${chapterId}/lip-sync` : `/audios/${chapterId}.json`,
-            mouthCues: lipSyncData?.mouthCues?.length || 0,
-            metadata: lipSyncData?.metadata || null,
-            cached: false
+            totalPages: pageNumbers.length,
+            generatedCount,
+            cachedCount,
+            errors
         });
     } catch (error) {
         console.error("[Chapter Lip Sync Error]:", error);
@@ -690,13 +717,10 @@ async function generateChapterLipSync(req, res) {
  */
 async function getChapterLipSync(req, res) {
     try {
-        const { courseId, chapterId } = req.params;
-        const data = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
-        if (!data) {
-            return res.status(404).json({ error: 'Lip sync not found' });
-        }
-        res.setHeader('Content-Type', 'application/json');
-        res.json(data);
+        res.status(400).json({
+            error: 'Single-file lip sync is disabled',
+            details: 'Use /lip-sync/:pageNumber for page-by-page lip sync.'
+        });
     } catch (error) {
         console.error('[Chapter Lip Sync GET Error]:', error);
         res.status(500).json({
@@ -1162,7 +1186,7 @@ async function regenerateChapterLipSync(req, res) {
 
         console.log(`[Chapter] Regenerating lip sync for chapter ${chapterId}...`);
 
-        // Delete old lip sync file
+        // Delete old lip sync files (single + page-based)
         const deleteResult = await fileUtils.deleteChapterLipSyncFile(chapterId, courseId);
         if (deleteResult.error) {
             console.warn(`[Chapter] Error deleting lip sync: ${deleteResult.error}`);
@@ -1170,26 +1194,61 @@ async function regenerateChapterLipSync(req, res) {
             console.log(`[Chapter] Deleted old lip sync file`);
         }
 
-        // Ensure audio exists before generating lip sync
-        const audioPath = await ensureChapterAudio(chapterId, courseId);
+        // Regenerate page-by-page lip sync only
+        const pageAudioDir = fileUtils.getPageAudioDir(chapterId, courseId);
+        let audioFiles = [];
+        try {
+            audioFiles = await fsPromises.readdir(pageAudioDir);
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                return res.status(400).json({
+                    error: 'Page audio not found',
+                    details: 'Generate page-by-page audio before lip sync.'
+                });
+            }
+            throw error;
+        }
 
-        // Generate new lip sync (using new structure)
-        const lipSyncPath = fileUtils.getLipSyncFilePath(chapterId, courseId, 'chapter');
-        const lipSyncDir = path.dirname(lipSyncPath);
-        await fsPromises.mkdir(lipSyncDir, { recursive: true });
-        
-        const lipSyncService = require('../services/lipSyncService');
-        await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+        const pageNumbers = audioFiles
+            .filter(name => /^page_\d+\.wav$/i.test(name))
+            .map(name => parseInt(name.replace(/^page_0*/, '').replace(/\.wav$/i, ''), 10))
+            .filter(num => !isNaN(num))
+            .sort((a, b) => a - b);
 
-        const lipSyncData = await fileUtils.readLipSyncFile(chapterId, courseId, 'chapter');
+        if (pageNumbers.length === 0) {
+            return res.status(400).json({
+                error: 'No page audio files found',
+                details: 'Generate page-by-page audio before lip sync.'
+            });
+        }
+
+        const results = [];
+        const errors = [];
+
+        for (const pageNumber of pageNumbers) {
+            try {
+                const audioPath = fileUtils.getPageAudioFilePath(chapterId, pageNumber, courseId);
+                const lipSyncPath = fileUtils.getPageLipSyncFilePath(chapterId, pageNumber, courseId);
+                await fsPromises.mkdir(path.dirname(lipSyncPath), { recursive: true });
+                await lipSyncService.generateLipSync(audioPath, lipSyncPath);
+                results.push({ page: pageNumber, success: true });
+            } catch (pageError) {
+                console.error(`[Chapter Lip Sync] Failed for page ${pageNumber}:`, pageError.message);
+                errors.push({ page: pageNumber, error: pageError.message });
+                results.push({ page: pageNumber, success: false, error: pageError.message });
+            }
+        }
 
         res.json({
-            message: 'Lip sync regenerated successfully.',
+            message: 'Page lip sync regenerated successfully.',
             chapterId,
-            lipSyncFile: courseId ? `/api/courses/${courseId}/chapters/${chapterId}/lip-sync` : `/audios/${chapterId}.json`,
-            mouthCues: lipSyncData?.mouthCues?.length || 0,
-            metadata: lipSyncData?.metadata || null,
-            deleted: deleteResult.deleted
+            deleted: deleteResult.deleted,
+            results: {
+                totalPages: pageNumbers.length,
+                successCount: results.filter(r => r.success).length,
+                failedCount: errors.length,
+                failedPages: errors
+            }
         });
     } catch (error) {
         console.error("[Chapter Lip Sync Regeneration Error]:", error);
