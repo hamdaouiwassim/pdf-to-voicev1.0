@@ -9,6 +9,12 @@ router.post('/register', authController.register);
 // POST /api/auth/login - Login
 router.post('/login', authController.login);
 
+// POST /api/auth/forgot-password - Request password reset
+router.post('/forgot-password', authController.forgotPassword);
+
+// POST /api/auth/reset-password - Reset password
+router.post('/reset-password', authController.resetPassword);
+
 // POST /api/auth/logout - Logout (requires authentication)
 router.post('/logout', requireAuth, authController.logout);
 

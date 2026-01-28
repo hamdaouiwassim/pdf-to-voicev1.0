@@ -29,6 +29,18 @@ ADMIN_PASSWORD=admin123
 SESSION_SECRET=titan-academy-secret-key-change-in-production
 
 # ===========================================
+# OPTIONAL - Email (SMTP) for Password Reset
+# ===========================================
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_smtp_user
+SMTP_PASS=your_smtp_password
+SMTP_FROM="Titan Academy <no-reply@titanacademy.com>"
+FRONTEND_URL=http://localhost:4080
+RESET_PASSWORD_URL=http://localhost:4080/reset-password
+
+# ===========================================
 # OPTIONAL - MySQL Database Configuration
 # ===========================================
 DB_HOST=localhost
@@ -134,6 +146,46 @@ GEMINI_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - **Description:** Secret key used to sign session cookies. Should be a random, secure string
 - **Example:** `SESSION_SECRET=your-random-secret-key-here`
 - **Security Note:** Use a strong, random secret in production. Generate with: `openssl rand -base64 32`
+
+---
+
+### Email (SMTP) for Password Reset
+
+These variables are required to send password reset emails.
+
+#### `SMTP_HOST`
+- **Description:** SMTP server host
+- **Example:** `SMTP_HOST=smtp.gmail.com`
+
+#### `SMTP_PORT`
+- **Default:** `587`
+- **Description:** SMTP server port
+- **Example:** `SMTP_PORT=587`
+
+#### `SMTP_SECURE`
+- **Default:** `false`
+- **Description:** Use TLS/SSL for SMTP
+- **Example:** `SMTP_SECURE=true`
+
+#### `SMTP_USER`
+- **Description:** SMTP username
+- **Example:** `SMTP_USER=your_smtp_user`
+
+#### `SMTP_PASS`
+- **Description:** SMTP password or app password
+- **Example:** `SMTP_PASS=your_smtp_password`
+
+#### `SMTP_FROM`
+- **Description:** From address used in reset emails
+- **Example:** `SMTP_FROM="Titan Academy <no-reply@titanacademy.com>"`
+
+#### `FRONTEND_URL`
+- **Description:** Base frontend URL used to build reset links
+- **Example:** `FRONTEND_URL=http://localhost:4080`
+
+#### `RESET_PASSWORD_URL`
+- **Description:** Full reset password URL. Overrides `FRONTEND_URL` if set.
+- **Example:** `RESET_PASSWORD_URL=https://app.example.com/reset-password`
 
 ---
 

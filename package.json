@@ -27,6 +27,7 @@
     "express-fileupload": "^1.5.2",
     "express-session": "^1.18.1",
     "mysql2": "^3.11.5",
+    "nodemailer": "^7.0.13",
     "pdf-parse": "1.1.*",
     "pdf-poppler": "^0.2.3",
     "pdfjs-dist": "^5.4.394",

@@ -1,5 +1,7 @@
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const db = require('../config/database');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 /**
  * Validate email format
@@ -235,6 +237,154 @@ async function register(req, res) {
 }
 
 /**
+ * Forgot password endpoint - Request a reset link
+ * POST /api/auth/forgot-password
+ */
+async function forgotPassword(req, res) {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                error: 'Email is required'
+            });
+        }
+
+        if (!isValidEmail(email)) {
+            return res.status(400).json({
+                error: 'Invalid email format'
+            });
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+        const users = await db.query(
+            'SELECT id, email, is_active FROM users WHERE email = ? AND is_active = TRUE',
+            [normalizedEmail]
+        );
+
+        if (users.length === 0) {
+            return res.json({
+                success: true,
+                message: 'If an account exists, a reset email has been sent.'
+            });
+        }
+
+        const user = users[0];
+        const resetToken = crypto.randomBytes(32).toString('base64url');
+        const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+        await db.query(
+            `INSERT INTO password_resets (user_id, token_hash, expires_at, request_ip, user_agent)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+                user.id,
+                tokenHash,
+                expiresAt,
+                req.ip || null,
+                req.get('user-agent') || null
+            ]
+        );
+
+        try {
+            await sendPasswordResetEmail(user.email, resetToken);
+        } catch (mailError) {
+            console.error("[Auth Forgot Password Email Error]:", mailError);
+            return res.status(500).json({
+                error: 'Failed to send reset email'
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: 'If an account exists, a reset email has been sent.'
+        });
+    } catch (error) {
+        console.error("[Auth Forgot Password Error]:", error);
+        res.status(500).json({
+            error: 'Forgot password request failed',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Reset password endpoint - Update password using reset token
+ * POST /api/auth/reset-password
+ */
+async function resetPassword(req, res) {
+    let connection;
+    try {
+        connection = await db.getConnection();
+        const { token, password } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Token is required' });
+        }
+
+        if (!password) {
+            return res.status(400).json({ error: 'Password is required' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+        }
+
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+        const resetRows = await connection.query(
+            `SELECT pr.id, pr.user_id, pr.expires_at, pr.used_at, u.is_active
+             FROM password_resets pr
+             JOIN users u ON u.id = pr.user_id
+             WHERE pr.token_hash = ?
+             LIMIT 1`,
+            [tokenHash]
+        );
+
+        const resetRecord = resetRows[0]?.[0];
+
+        if (!resetRecord || resetRecord.used_at || new Date(resetRecord.expires_at) < new Date()) {
+            return res.status(400).json({ error: 'Invalid or expired token' });
+        }
+
+        if (!resetRecord.is_active) {
+            return res.status(403).json({ error: 'User account is inactive' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        await connection.beginTransaction();
+        await connection.query(
+            'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?',
+            [hashedPassword, resetRecord.user_id]
+        );
+        await connection.query(
+            'UPDATE password_resets SET used_at = NOW() WHERE id = ?',
+            [resetRecord.id]
+        );
+        await connection.commit();
+
+        return res.json({
+            success: true,
+            message: 'Password reset successfully'
+        });
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error("[Auth Reset Password Error]:", error);
+        res.status(500).json({
+            error: 'Password reset failed',
+            details: error.message
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+}
+
+/**
  * Check authentication status
  * GET /api/auth/status
  */
@@ -261,6 +411,8 @@ async function getAuthStatus(req, res) {
 module.exports = {
     login,
     register,
+    forgotPassword,
+    resetPassword,
     logout,
     getAuthStatus
 };

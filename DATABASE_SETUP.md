@@ -10,7 +10,7 @@ The tables are **automatically created** when the MySQL container starts for the
 
 To verify:
 ```bash
-docker compose exec mysql mysql -u app_user -papp_password titan_academy -e "SHOW TABLES;"
+ 
 ```
 
 You should see:
