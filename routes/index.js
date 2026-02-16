@@ -10,6 +10,7 @@ const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const { requireSubscription } = require('../middleware/subscription');
 const subscriptionController = require('../controllers/subscriptionController');
+const progressController = require('../controllers/progressController');
 
 // Route imports
 const authRoutes = require('./authRoutes');
@@ -58,6 +59,9 @@ router.post('/users/:userId/enroll/:courseId', requireAuth, subscriptionControll
 
 // Admin: Cancel user enrollment in course
 router.delete('/users/:userId/enroll/:courseId', requireAuth, subscriptionController.cancelUserEnrollment);
+
+// Course progress route (before subscription middleware to avoid blocking)
+router.get('/courses/:courseId/progress', requireAuth, progressController.getCourseProgress);
 
 // Course routes (require subscription and enrollment)
 router.use('/courses', requireAuth, requireSubscription, courseRoutes);

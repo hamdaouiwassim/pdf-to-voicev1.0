@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router({ mergeParams: true }); // mergeParams to access courseId from parent route
 const chapterController = require('../controllers/chapterController');
 const quizController = require('../controllers/quizController');
+const progressController = require('../controllers/progressController');
 const validation = require('../middleware/validation');
 
 // POST /api/courses/:courseId/chapters - Create a new chapter
@@ -52,6 +53,13 @@ router.put('/:chapterId', validation.validateDocId, chapterController.updateChap
 
 // DELETE /api/courses/:courseId/chapters/:chapterId - Delete a chapter
 router.delete('/:chapterId', validation.validateDocId, chapterController.deleteChapter);
+
+// Progress routes
+// POST /api/courses/:courseId/chapters/:chapterId/progress - Save chapter progress
+router.post('/:chapterId/progress', validation.validateDocId, progressController.saveProgress);
+
+// GET /api/courses/:courseId/chapters/:chapterId/progress - Get chapter progress
+router.get('/:chapterId/progress', validation.validateDocId, progressController.getChapterProgress);
 
 // Quiz routes (public - for students)
 // GET /api/courses/:courseId/chapters/:chapterId/quiz - Get quiz questions for a chapter

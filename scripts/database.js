@@ -399,6 +399,33 @@ async function createTables() {
         `);
         console.log('✓ Final project submissions table created/verified');
 
+        // Create chapter_progress table (tracks user progress per chapter)
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS chapter_progress (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                course_id VARCHAR(36) NOT NULL,
+                chapter_id VARCHAR(36) NOT NULL,
+                last_page_number INT DEFAULT 0,
+                total_pages INT DEFAULT 0,
+                status ENUM('not_started', 'in_progress', 'completed') DEFAULT 'not_started',
+                progress_percentage DECIMAL(5, 2) DEFAULT 0.00,
+                last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+                FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+                UNIQUE KEY unique_user_chapter (user_id, chapter_id),
+                INDEX idx_user_id (user_id),
+                INDEX idx_course_id (course_id),
+                INDEX idx_chapter_id (chapter_id),
+                INDEX idx_user_course (user_id, course_id),
+                INDEX idx_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        console.log('✓ Chapter progress table created/verified');
+
         // Verify tables
         const tables = await db.query('SHOW TABLES');
         console.log('\n✓ All tables created successfully!');

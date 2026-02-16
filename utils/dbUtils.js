@@ -1874,6 +1874,170 @@ async function getBestQuizAttempt(userId, chapterId) {
     return attempt;
 }
 
+/**
+ * Chapter Progress Database Operations
+ */
+
+/**
+ * Save or update chapter progress for a user
+ * Uses INSERT ... ON DUPLICATE KEY UPDATE for upsert behavior
+ * @param {Object} progressData - Progress data
+ * @returns {Promise<Object>} Updated progress record
+ */
+async function saveChapterProgress(progressData) {
+    const { userId, courseId, chapterId, lastPageNumber, totalPages } = progressData;
+
+    const progressPercentage = totalPages > 0
+        ? Math.min(100, Math.round((lastPageNumber / totalPages) * 100 * 100) / 100)
+        : 0;
+
+    let status = 'not_started';
+    if (lastPageNumber >= totalPages && totalPages > 0) {
+        status = 'completed';
+    } else if (lastPageNumber > 0) {
+        status = 'in_progress';
+    }
+
+    await db.query(
+        `INSERT INTO chapter_progress (
+            user_id, course_id, chapter_id, last_page_number,
+            total_pages, status, progress_percentage, last_accessed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE
+            last_page_number = IF(status = 'completed', last_page_number, VALUES(last_page_number)),
+            total_pages = IF(status = 'completed', total_pages, VALUES(total_pages)),
+            status = IF(status = 'completed', 'completed', VALUES(status)),
+            progress_percentage = IF(status = 'completed', 100.00, VALUES(progress_percentage)),
+            last_accessed_at = NOW()`,
+        [userId, courseId, chapterId, lastPageNumber, totalPages, status, progressPercentage]
+    );
+
+    return await getChapterProgress(userId, chapterId);
+}
+
+/**
+ * Get progress for a specific chapter
+ * @param {number} userId - User ID
+ * @param {string} chapterId - Chapter ID
+ * @returns {Promise<Object|null>} Progress record or null
+ */
+async function getChapterProgress(userId, chapterId) {
+    const results = await db.query(
+        `SELECT 
+            id,
+            user_id as userId,
+            course_id as courseId,
+            chapter_id as chapterId,
+            last_page_number as lastPageNumber,
+            total_pages as totalPages,
+            status,
+            progress_percentage as progressPercentage,
+            last_accessed_at as lastAccessedAt,
+            created_at as createdAt,
+            updated_at as updatedAt
+         FROM chapter_progress
+         WHERE user_id = ? AND chapter_id = ?`,
+        [userId, chapterId]
+    );
+
+    return results.length > 0 ? results[0] : null;
+}
+
+/**
+ * Get all chapter progress for a user in a specific course
+ * @param {number} userId - User ID
+ * @param {string} courseId - Course ID
+ * @returns {Promise<Array>} Array of progress records
+ */
+async function getCourseChapterProgress(userId, courseId) {
+    return await db.query(
+        `SELECT 
+            cp.id,
+            cp.user_id as userId,
+            cp.course_id as courseId,
+            cp.chapter_id as chapterId,
+            cp.last_page_number as lastPageNumber,
+            cp.total_pages as totalPages,
+            cp.status,
+            cp.progress_percentage as progressPercentage,
+            cp.last_accessed_at as lastAccessedAt,
+            ch.chapter_name as chapterName,
+            (SELECT COUNT(*) FROM quiz_questions qq WHERE qq.chapter_id = cp.chapter_id) > 0 as hasQuiz,
+            COALESCE(
+                (SELECT MAX(qa.percentage) FROM quiz_attempts qa 
+                 WHERE qa.user_id = cp.user_id AND qa.chapter_id = cp.chapter_id), 0
+            ) as bestQuizScore
+         FROM chapter_progress cp
+         JOIN chapters ch ON cp.chapter_id = ch.id
+         WHERE cp.user_id = ? AND cp.course_id = ?
+         ORDER BY cp.last_accessed_at DESC`,
+        [userId, courseId]
+    );
+}
+
+/**
+ * Get the last accessed chapter for a user in a course (to resume)
+ * @param {number} userId - User ID
+ * @param {string} courseId - Course ID
+ * @returns {Promise<Object|null>} Last accessed chapter progress or null
+ */
+async function getLastAccessedChapter(userId, courseId) {
+    const results = await db.query(
+        `SELECT 
+            cp.id,
+            cp.user_id as userId,
+            cp.course_id as courseId,
+            cp.chapter_id as chapterId,
+            cp.last_page_number as lastPageNumber,
+            cp.total_pages as totalPages,
+            cp.status,
+            cp.progress_percentage as progressPercentage,
+            cp.last_accessed_at as lastAccessedAt,
+            ch.chapter_name as chapterName
+         FROM chapter_progress cp
+         JOIN chapters ch ON cp.chapter_id = ch.id
+         WHERE cp.user_id = ? AND cp.course_id = ?
+         ORDER BY cp.last_accessed_at DESC
+         LIMIT 1`,
+        [userId, courseId]
+    );
+
+    return results.length > 0 ? results[0] : null;
+}
+
+/**
+ * Calculate overall course completion percentage
+ * @param {number} userId - User ID
+ * @param {string} courseId - Course ID
+ * @returns {Promise<Object>} Course progress summary
+ */
+async function getCourseProgressSummary(userId, courseId) {
+    const results = await db.query(
+        `SELECT 
+            COUNT(ch.id) as totalChapters,
+            COUNT(cp.id) as startedChapters,
+            SUM(CASE WHEN cp.status = 'completed' THEN 1 ELSE 0 END) as completedChapters,
+            ROUND(
+                CASE 
+                    WHEN COUNT(ch.id) = 0 THEN 0 
+                    ELSE (SUM(COALESCE(cp.progress_percentage, 0)) / COUNT(ch.id))
+                END, 2
+            ) as overallPercentage
+         FROM chapters ch
+         LEFT JOIN chapter_progress cp ON ch.id = cp.chapter_id AND cp.user_id = ?
+         WHERE ch.course_id = ?`,
+        [userId, courseId]
+    );
+
+    const row = results[0] || {};
+    return {
+        totalChapters: parseInt(row.totalChapters) || 0,
+        startedChapters: parseInt(row.startedChapters) || 0,
+        completedChapters: parseInt(row.completedChapters) || 0,
+        overallPercentage: parseFloat(row.overallPercentage) || 0
+    };
+}
+
 module.exports = {
     // Course operations
     createCourse,
@@ -1937,6 +2101,13 @@ module.exports = {
     createQuizAttempt,
     getQuizAttemptById,
     getQuizAttemptsByUserAndChapter,
-    getBestQuizAttempt
+    getBestQuizAttempt,
+
+    // Progress operations
+    saveChapterProgress,
+    getChapterProgress,
+    getCourseChapterProgress,
+    getLastAccessedChapter,
+    getCourseProgressSummary
 };
 

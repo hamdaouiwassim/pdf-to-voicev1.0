@@ -3,4 +3,5 @@ temp/
 .env
 audios/
 uploads/
+media/
 *.log
